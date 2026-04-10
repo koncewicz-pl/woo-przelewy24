@@ -1,0 +1,9 @@
+{
+  "name": "koncewicz-pl/woo-przelewy24",
+  "description": "Przelewy24 payment gateway for WooCommerce",
+  "type": "wordpress-plugin",
+  "license": "GPL-3.0-or-later",
+  "require": {
+    "composer/installers": "^2.0"
+  }
+}

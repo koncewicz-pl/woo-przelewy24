@@ -69,25 +69,57 @@ trait Payment_Helpers
         return ['result' => 'success', 'redirect' => $order->get_checkout_payment_url(true)];
     }
 
-    // A fake WP_Error must be returned in order to contract that the return is being processed due to the asynchronicity of the operation, on notification step the true refund will be completed
+
     public function process_refund($order_id, $amount = null, $reason = ''): \WP_Error
     {
         $message = '';
         $amount = (float)$amount;
+        $line_items = $this->extract_line_items_from_request();
 
         try {
-            $refund = new Refund($order_id, $amount, $reason);
+            $refund = new Refund($order_id, $amount, $reason, $line_items);
             $refund->register();
-            $status = $refund->get_status();
-            $message = $refund->refund_notes()[$refund->status];
+            $message = __('The refund is being processed', 'woocommerce-p24');
 
-            do_action('przelewy24_after_refund_process', $refund->order, $amount, $reason, $status, $this->id);
+            do_action('przelewy24_after_refund_process', wc_get_order($order_id), $amount, $reason, null, $this->id);
         } catch (\Exception $e) {
             $message = $e->getMessage();
             Logger::log($e->getMessage(), Logger::EXCEPTION);
         }
 
         return new \WP_Error('refund', $message);
+    }
+
+    private function extract_line_items_from_request(): ?array
+    {
+        if (!isset($_POST['line_item_qtys']) || !isset($_POST['line_item_totals'])) {
+            return null;
+        }
+
+        $line_item_qtys = json_decode(sanitize_text_field(wp_unslash($_POST['line_item_qtys'])), true);
+        $line_item_totals = json_decode(sanitize_text_field(wp_unslash($_POST['line_item_totals'])), true);
+        $line_item_tax_totals = isset($_POST['line_item_tax_totals']) ? json_decode(sanitize_text_field(wp_unslash($_POST['line_item_tax_totals'])), true) : [];
+
+        if (empty($line_item_qtys) && empty($line_item_totals)) {
+            return null;
+        }
+
+        $line_items = [];
+        $item_ids = array_unique(array_merge(array_keys($line_item_qtys ?? []), array_keys($line_item_totals ?? [])));
+
+        foreach ($item_ids as $item_id) {
+            $line_items[$item_id] = [
+                'qty' => isset($line_item_qtys[$item_id]) ? max($line_item_qtys[$item_id], 0) : 0,
+                'refund_total' => isset($line_item_totals[$item_id]) ? wc_format_decimal($line_item_totals[$item_id]) : 0,
+                'refund_tax' => isset($line_item_tax_totals[$item_id]) ? array_filter(array_map('wc_format_decimal', $line_item_tax_totals[$item_id])) : [],
+            ];
+        }
+
+        if (!empty($line_items)) {
+            error_log('[P24 Refund] Extracted line items from request: ' . json_encode($line_items));
+        }
+
+        return !empty($line_items) ? $line_items : null;
     }
 
     public function admin_options()

@@ -45,12 +45,28 @@ abstract class Webhook
     protected function get_order(?int $order_id = null): \WC_Order
     {
         $input = $this->get_input();
-        $is_legacy = $input['checkout'] == 'legacy';
-        $order_key = $input['orderKey'] ?? null;
+        $is_legacy = ($input['checkout'] ?? '') == 'legacy';
+        $order_key = $input['orderKey'] ?? $input['order_key'] ?? null;
 
         if (empty($order_id)) {
-            $order_id = isset($input['orderId']) ? (int) $input['orderId'] : false;
-            $order_id = $is_legacy ? $order_id : WC()->session->get('store_api_draft_order');
+            $order_id = false;
+
+            if (isset($input['orderId'])) {
+                $order_id = (int) $input['orderId'];
+            } elseif (isset($input['order_id'])) {
+                $order_id = (int) $input['order_id'];
+            } elseif (!empty($_POST['orderId'])) {
+                $order_id = (int) $_POST['orderId'];
+            } elseif (!empty($_REQUEST['orderId'])) {
+                $order_id = (int) $_REQUEST['orderId'];
+            }
+
+            if ($is_legacy) {
+                // legacy expects the orderId from payload
+                $order_id = $order_id ?: false;
+            } else {
+                $order_id = $order_id ?: (WC()->session ? WC()->session->get('store_api_draft_order') : false);
+            }
         }
 
         $order = wc_get_order($order_id);
@@ -59,7 +75,7 @@ abstract class Webhook
             throw new \Exception('Order not found');
         }
 
-        if ($is_legacy && $order->get_order_key() !== $order_key) {
+        if ($is_legacy && $order_key !== null && $order->get_order_key() !== $order_key) {
             throw new \Exception('Invalid order key');
         }
 
@@ -69,9 +85,13 @@ abstract class Webhook
     protected function get_payment_details(): array
     {
         $input = $this->get_input();
-        $payment_details = $input['paymentDetails'];
+        $payment_details = $input['paymentDetails'] ?? [];
 
-        if ($payment_details['oneClick']) {
+        if (!is_array($payment_details)) {
+            $payment_details = [];
+        }
+
+        if (!empty($payment_details['oneClick'] ?? null)) {
             $payment_details['oneclick'] = $payment_details['oneClick'];
         }
 
@@ -86,7 +106,7 @@ abstract class Webhook
     {
         if (empty($this->input)) {
             $input = file_get_contents('php://input');
-            $this->input = json_decode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $this->input = json_decode($input, true, 512, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
             Logger::log(['input' => $this->input], Logger::DEBUG, true);
         }

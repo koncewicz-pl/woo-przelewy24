@@ -36,15 +36,12 @@ class Gateway extends WC_Payment_Gateway
     public function __construct()
     {
         $this->id = Core::CARD_IN_SHOP_METHOD;
-
         $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/card.svg');
         $this->method = Payment_Methods::CARD_PAYMENT;
         $this->method_alt = Payment_Methods::CARD_PAYMENT_ALT;
         $this->description = $this->get_option('description');
         $this->supports = ['products', 'refunds', 'p24-subscription'];
-
         $this->method_title = __('Przelewy24 - Card payment', 'woocommerce-p24');
-        /* translators: %s: URL to the general configuration page */
         $this->method_description = sprintf(__('Card payment option on the shop <br /><a href="%s">General configuration</a>', 'woocommerce-p24'), Core::get_settings_url());
         $this->title = $this->get_option('title') ?: __('Card payment', 'woocommerce-p24');
 
@@ -70,9 +67,9 @@ class Gateway extends WC_Payment_Gateway
         $for = $this->get_option('c2p_for');
         $result = $enabled;
 
-        if ($for == 'logged_in') {
+        if ($for === 'logged_in') {
             $result = is_user_logged_in() ? $enabled : false;
-        } elseif ($for == 'logged_out') {
+        } elseif ($for === 'logged_out') {
             $result = is_user_logged_in() ? false : $enabled;
         }
 
@@ -133,14 +130,13 @@ class Gateway extends WC_Payment_Gateway
                 'type' => 'code',
                 'title' => __('Styling options', 'woocommerce-p24'),
                 'default' => '{
-                        "lang": "pl",
-                        "loader": true,
-                        "errorMessage": false, 
-                        "agreement": { 
-                            "contentEnabled": { "enabled": false, "checkboxEnabled": false }
-                        }
-                    }',
-                /* translators: %s: URL to the detailed documentation page */
+                    "lang": "pl",
+                    "loader": true,
+                    "errorMessage": false,
+                    "agreement": {
+                        "contentEnabled": { "enabled": false, "checkboxEnabled": false }
+                    }
+                }',
                 'description' => sprintf(__('Widget styling settings in JSON format, detailed documentation available <a href="%s" target="_blank">here</a>', 'woocommerce-p24'), 'https://developers.przelewy24.pl/extended/index.php?pl#tag/Inicjalizacja-formularza/Stylowanie-oraz-opcje-formularza'),
             ]
         ], $this->fee_settings());
@@ -202,33 +198,54 @@ class Gateway extends WC_Payment_Gateway
 
     public function payment(\WC_Order $order, array $payment_data = []): array
     {
+        if (!empty($payment_data['paymentMethodData']) && is_array($payment_data['paymentMethodData'])) {
+            $flat = [];
+            foreach ($payment_data['paymentMethodData'] as $item) {
+                if (!is_array($item)) continue;
+                if (!array_key_exists('key', $item)) continue;
+                $k = $item['key'];
+                $v = array_key_exists('value', $item) ? $item['value'] : '';
+                if (is_array($v) || is_object($v)) {
+                    $v = json_encode($v);
+                }
+                if (is_bool($v)) {
+                    $v = $v ? '1' : '0';
+                }
+                $flat[$k] = $v;
+            }
+            $payment_data = array_merge($payment_data, $flat);
+        }
+
         $card_data = $payment_data;
         $payment_data = $this->sanitize($payment_data);
         $this->validate($payment_data);
 
         $result = [
             'redirect' => $order->get_checkout_order_received_url(),
-            'status' => 'pending'
+            'status'   => 'pending'
         ];
 
         $type = $payment_data['type'];
         $save = $payment_data['save'];
-        $accept_rules = $payment_data['regulation'];
 
+        if (Helper::order_has_subscription_product($order) && $save) {
+            $order->update_meta_data('_p24_recurring_consent', 'yes');
+            $order->update_meta_data('_p24_recurring_consent_at', current_time('mysql'));
+            $order->save();
+        }
+
+        $accept_rules = $payment_data['regulation'];
         $method_id = Gateways_Manager::get_method_id_matching_group(Payment_Methods::CARD_PAYMENT_ALT, $order->get_total());
 
         $transaction = new Transaction($order->get_id(), $method_id, $accept_rules);
+
         $card_payment_type = Transaction::CARD_STANDARD;
 
         if (Helper::order_has_subscription_product($transaction->order)) {
             $card_payment_type = Transaction::CARD_INITIAL;
-        }
-
-        if ($type == 'c2p') {
+        } elseif ($type === 'c2p') {
             $card_payment_type = Transaction::CARD_C2P;
-        }
-
-        if ($save && $type != 'one-click') {
+        } elseif ($save && $type !== 'one-click') {
             $order->update_meta_data('_p24_save_card', true);
             $order->save_meta_data();
             $card_payment_type = Transaction::CARD_INITIAL;
@@ -237,12 +254,11 @@ class Gateway extends WC_Payment_Gateway
         switch ($type) {
             case 'card-data':
                 $transaction->set_card(new Card_Simple($card_data), $card_payment_type);
-
                 break;
+
             case 'one-click':
                 if ($this->one_click_enabled()) {
-                    $one_click_id = (int)$payment_data['oneclick'];
-
+                    $one_click_id = (int) $payment_data['oneclick'];
                     $reference = Reference::get_and_check($one_click_id, $order->get_customer_id());
 
                     if ($reference) {
@@ -267,7 +283,6 @@ class Gateway extends WC_Payment_Gateway
         if ($context->payment_method === Core::CARD_IN_SHOP_METHOD) {
             try {
                 $details = $this->payment($context->order, $context->payment_data);
-
                 $payment_result->set_payment_details($details);
                 $payment_result->set_status($details['status']);
             } catch (\Exception $e) {
@@ -280,8 +295,8 @@ class Gateway extends WC_Payment_Gateway
     public function get_receipt_config(): array
     {
         $get_one_clicks = is_checkout();
-
         $config = Config::get_instance();
+
         $settings = Card_Helper::generate_keys_for_tokenization();
         $options = json_decode($this->get_option('styles'));
         $settings['options'] = $options ?: [];
@@ -292,17 +307,17 @@ class Gateway extends WC_Payment_Gateway
         if ($get_one_clicks && $one_click_enabled) {
             $current_user = wp_get_current_user();
 
-            $one_click_items = Reference::findAll(['where' =>
-                ["user.ID = %d AND t.type != 'blik'", (int)$current_user->ID]
+            $one_click_items = Reference::findAll([
+                'where' => ["user.ID = %d AND t.type != 'blik'", (int)$current_user->ID]
             ]);
 
             $one_click_items = array_map(function ($card) {
                 return [
-                    'id' => $card->get_id(),
-                    'type' => $card->get_type(),
-                    'last_digits' => $card->get_info(),
-                    'valid_to' => $card->get_valid_to()->format('m/Y'),
-                    'logo' => $card->get_icon()
+                    'id'         => $card->get_id(),
+                    'type'       => $card->get_type(),
+                    'last_digits'=> $card->get_info(),
+                    'valid_to'   => $card->get_valid_to()->format('m/Y'),
+                    'logo'       => $card->get_icon()
                 ];
             }, $one_click_items);
         }
@@ -322,9 +337,15 @@ class Gateway extends WC_Payment_Gateway
             'i18n' => [
                 'label' => [
                     'save' => __('Save card reference for future payments', 'woocommerce-p24'),
+                    'save_oneclick'  => __('Store my card for convenient future checkouts.', 'woocommerce-p24'),
+                    'save_recurring' => __('I agree to save my card and authorize future recurring charges in accordance with the terms and conditions.', 'woocommerce-p24'),
                     'submit' => __('Pay by card', 'woocommerce-p24'),
-                    /* translators: %1$s: URL to the regulations page, %2$s: URL to the information obligation page */
-                    'regulation' => sprintf(__('I hereby state that I have read the <a href="%1$s" target="_blank">regulations</a> and <a href="%2$s" target="_blank">information obligation</a> of "Przelewy24"', 'woocommerce-p24'), Core::get_rules_url(), Core::get_tos_url()),
+                    'regulation' => sprintf(
+                        __('I hereby state that I have read the <a href="%1$s" target="_blank">regulations</a> and <a href="%2$s" target="_blank">information obligation</a> of "Przelewy24"',
+                            'woocommerce-p24'),
+                        Core::get_rules_url(),
+                        Core::get_tos_url()
+                    ),
                 ],
                 'error' => [
                     'general' => _x('Unknown error has occurred', 'Card in the shop', 'woocommerce-p24'),
@@ -332,8 +353,10 @@ class Gateway extends WC_Payment_Gateway
                 ],
                 'use_saved' => __('Use saved payment methods - on-click', 'woocommerce-p24'),
                 'or' => __('or use new card details', 'woocommerce-p24'),
+                'use_new_card' => __('Use new card', 'woocommerce-p24'),
             ],
             'recurring' => $recurring,
+            'hasSubscription' => $recurring,
             'oneClick' => [
                 'enabled' => $one_click_enabled,
                 'items' => $one_click_items

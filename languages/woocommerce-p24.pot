@@ -1,15 +1,15 @@
-# Copyright (C) 2025 PayPro S.A.
+# Copyright (C) 2026 PayPro S.A.
 # This file is distributed under the same license as the Przelewy24 Payment Gateway plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: Przelewy24 Payment Gateway 1.0.16\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/1.0.16\n"
+"Project-Id-Version: Przelewy24 Payment Gateway 1.0.18\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/WooCommerce-release_05.02.2026\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2025-11-18T15:36:56+00:00\n"
+"POT-Creation-Date: 2026-02-05T13:41:33+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: woocommerce-p24\n"
@@ -198,7 +198,7 @@ msgstr ""
 
 #: includes/Gateways/Apple_Pay/Gateway.php:126
 #: includes/Gateways/Blik/Gateway.php:72
-#: includes/Gateways/Card/Gateway.php:99
+#: includes/Gateways/Card/Gateway.php:96
 #: includes/Gateways/Google_Pay/Gateway.php:106
 #: includes/Gateways/Online_Payments/Gateway.php:56
 msgid "Payment title"
@@ -206,7 +206,7 @@ msgstr ""
 
 #: includes/Gateways/Apple_Pay/Gateway.php:127
 #: includes/Gateways/Blik/Gateway.php:73
-#: includes/Gateways/Card/Gateway.php:100
+#: includes/Gateways/Card/Gateway.php:97
 #: includes/Gateways/Google_Pay/Gateway.php:107
 #: includes/Gateways/Online_Payments/Gateway.php:57
 msgid "Name of payment visible at checkout"
@@ -214,7 +214,7 @@ msgstr ""
 
 #: includes/Gateways/Apple_Pay/Gateway.php:132
 #: includes/Gateways/Blik/Gateway.php:78
-#: includes/Gateways/Card/Gateway.php:105
+#: includes/Gateways/Card/Gateway.php:102
 #: includes/Gateways/Google_Pay/Gateway.php:112
 #: includes/Gateways/Online_Payments/Gateway.php:62
 msgid "Description"
@@ -222,7 +222,7 @@ msgstr ""
 
 #: includes/Gateways/Apple_Pay/Gateway.php:133
 #: includes/Gateways/Blik/Gateway.php:79
-#: includes/Gateways/Card/Gateway.php:106
+#: includes/Gateways/Card/Gateway.php:103
 #: includes/Gateways/Google_Pay/Gateway.php:113
 #: includes/Gateways/Online_Payments/Gateway.php:63
 msgid "Description of payment which the user sees during checkout"
@@ -282,7 +282,7 @@ msgstr ""
 #. translators: %1$s: URL to the regulations page, %2$s: URL to the information obligation page
 #: includes/Gateways/Apple_Pay/Gateway.php:259
 #: includes/Gateways/Blik/Gateway.php:243
-#: includes/Gateways/Card/Gateway.php:327
+#: includes/Gateways/Card/Gateway.php:344
 #: includes/Gateways/Google_Pay/Gateway.php:218
 #: includes/Gateways/Online_Payments/Gateway.php:176
 #: includes/Gateways/Virtual_Gateway/Virtual_Gateway_Legacy_Support.php:45
@@ -297,7 +297,7 @@ msgstr ""
 
 #: includes/Gateways/Apple_Pay/Gateway.php:263
 #: includes/Gateways/Blik/Gateway.php:231
-#: includes/Gateways/Card/Gateway.php:331
+#: includes/Gateways/Card/Gateway.php:352
 #: includes/Gateways/Google_Pay/Gateway.php:222
 #: includes/Gateways/Online_Payments/Gateway.php:171
 #: includes/Gateways/Online_Payments/Online_Payments_Legacy_Support.php:40
@@ -400,102 +400,122 @@ msgctxt "BLIK one-click"
 msgid "or use BLIK code"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:46
+#: includes/Gateways/Card/Card_Legacy_Support.php:47
+#: includes/Gateways/Card/Gateway.php:340
+msgid "Store my card for convenient future checkouts."
+msgstr ""
+
+#: includes/Gateways/Card/Card_Legacy_Support.php:48
+#: includes/Gateways/Card/Gateway.php:341
+msgid "I agree to save my card and authorize future recurring charges in accordance with the terms and conditions."
+msgstr ""
+
+#: includes/Gateways/Card/Card_Legacy_Support.php:49
+msgid "I accept the terms and conditions."
+msgstr ""
+
+#: includes/Gateways/Card/Card_Legacy_Support.php:51
+msgid "You must accept the terms and conditions."
+msgstr ""
+
+#: includes/Gateways/Card/Gateway.php:44
 msgid "Przelewy24 - Card payment"
 msgstr ""
 
-#. translators: %s: URL to the general configuration page
-#: includes/Gateways/Card/Gateway.php:48
+#: includes/Gateways/Card/Gateway.php:45
 #, php-format
 msgid "Card payment option on the shop <br /><a href=\"%s\">General configuration</a>"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:49
-#: includes/Gateways/Card/Gateway.php:101
+#: includes/Gateways/Card/Gateway.php:46
+#: includes/Gateways/Card/Gateway.php:98
 msgid "Card payment"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:89
+#: includes/Gateways/Card/Gateway.php:86
 msgid "Enable Przelewy24 - card payments in-store"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:91
+#: includes/Gateways/Card/Gateway.php:88
 msgid "<h3>Card Payments</h3>Enabling this option allows customers to pay directly using their credit or debit cards within the store. The payment form is securely embedded on the website, ensuring a seamless and user-friendly experience for buyers. <br/><br/><strong>Requirements:</strong><ul><li>Before enabling this option, please contact Przelewy24 to activate the necessary services on your account.</li><li>Ensure your store has an SSL certificate to secure customer data.</li></ul><br/><em>Example view for the buyer:</em><br/><img src=\"https://www.przelewy24.pl/storage/app/media/do-pobrania/gotowe-wtyczki/woocommerce/helper/en_karta_lvl0.png\" alt=\"Card payment example\" style=\"max-width: 400px\">."
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:94
+#: includes/Gateways/Card/Gateway.php:91
 msgid "Enabling this option allows for card payments directly within the store using a dedicated card form displayed on the website."
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:110
+#: includes/Gateways/Card/Gateway.php:107
 msgid "Click to Pay enabled"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:111
+#: includes/Gateways/Card/Gateway.php:108
 msgid "Enable Click to Pay functionality"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:116
+#: includes/Gateways/Card/Gateway.php:113
 msgid "Click to Pay enabled for"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:119
+#: includes/Gateways/Card/Gateway.php:116
 msgid "both, logged and non-logged users"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:120
+#: includes/Gateways/Card/Gateway.php:117
 msgid "logged users"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:121
+#: includes/Gateways/Card/Gateway.php:118
 msgid "non-logged users"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:126
+#: includes/Gateways/Card/Gateway.php:123
 msgid "One Click Card Payment"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:127
+#: includes/Gateways/Card/Gateway.php:124
 msgid "Enable one click card payment"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:128
+#: includes/Gateways/Card/Gateway.php:125
 msgid "If enabled, prevents use of Click to Pay for logged users"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:129
+#: includes/Gateways/Card/Gateway.php:126
 msgid "<h3>One Click Card Payment</h3>Enabling this option allows for card payments using a saved alias. This functionality is available only for logged-in buyers who have an account in the store. It becomes accessible after the customer's first payment, provided they have agreed to save their card details. <br/><strong>Before turning this option on, please contact P24 to enable the necessary services on your account for on-site card payments.</strong><br/><br/><em>Example view for the buyer:</em><br/><img src=\"https://www.przelewy24.pl/storage/app/media/do-pobrania/gotowe-wtyczki/woocommerce/helper/en_karta_oneclick.png\" alt=\"One Click Card Payment\" style=\"max-width: 400px\">"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:134
+#: includes/Gateways/Card/Gateway.php:131
 msgid "Styling options"
 msgstr ""
 
-#. translators: %s: URL to the detailed documentation page
-#: includes/Gateways/Card/Gateway.php:144
+#: includes/Gateways/Card/Gateway.php:140
 #, php-format
 msgid "Widget styling settings in JSON format, detailed documentation available <a href=\"%s\" target=\"_blank\">here</a>"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:324
+#: includes/Gateways/Card/Gateway.php:339
 msgid "Save card reference for future payments"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:325
+#: includes/Gateways/Card/Gateway.php:342
 msgid "Pay by card"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:330
+#: includes/Gateways/Card/Gateway.php:351
 msgctxt "Card in the shop"
 msgid "Unknown error has occurred"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:333
+#: includes/Gateways/Card/Gateway.php:354
 msgid "Use saved payment methods - on-click"
 msgstr ""
 
-#: includes/Gateways/Card/Gateway.php:334
+#: includes/Gateways/Card/Gateway.php:355
 msgid "or use new card details"
+msgstr ""
+
+#: includes/Gateways/Card/Gateway.php:356
+msgid "Use new card"
 msgstr ""
 
 #: includes/Gateways/Google_Pay/Gateway.php:46
@@ -615,6 +635,11 @@ msgstr ""
 
 #: includes/Gateways/Online_Payments/Gateway.php:93
 msgid "Select the feature methods"
+msgstr ""
+
+#: includes/Gateways/Payment_Helpers.php:82
+#: includes/Models/Refund.php:119
+msgid "The refund is being processed"
 msgstr ""
 
 #: includes/Gateways/Settings_Helper.php:38
@@ -760,6 +785,14 @@ msgstr ""
 
 #: includes/General/Settings.php:92
 msgid "Send admin new order notification right after order is created (before payment)."
+msgstr ""
+
+#: includes/General/Settings.php:95
+msgid "Wait for Payment Confirmation"
+msgstr ""
+
+#: includes/General/Settings.php:96
+msgid "The customer stays on the Przelewy24 page until the transaction is confirmed. Recommended for smoother checkout and increased trust."
 msgstr ""
 
 #: includes/Installments/Settings.php:16
@@ -916,31 +949,27 @@ msgstr ""
 msgid "Attempted card charge failed"
 msgstr ""
 
-#. translators: %s: Order number
-#: includes/Models/Refund.php:107
+#: includes/Models/Refund.php:108
 #, php-format
-msgid "Return to order no. %s"
-msgstr ""
-
-#: includes/Models/Refund.php:117
-#: includes/Models/Refund.php:236
-msgid "The order was successfully refunded"
+msgid "Refund to order no. %s"
 msgstr ""
 
 #: includes/Models/Refund.php:118
-msgid "The refund is being processed"
-msgstr ""
-
-#: includes/Models/Refund.php:119
-msgid "Refund must be accepted by payment provider"
+#: includes/Models/Refund.php:242
+msgid "The order was successfully refunded"
 msgstr ""
 
 #: includes/Models/Refund.php:120
+msgid "Refund must be accepted by payment provider"
+msgstr ""
+
+#: includes/Models/Refund.php:121
 #: includes/Models/Refund.php:270
+#: includes/Models/Refund.php:276
 msgid "Refund was rejected"
 msgstr ""
 
-#: includes/Models/Refund.php:130
+#: includes/Models/Refund.php:131
 msgid "Order does not exist at przelewy24 system"
 msgstr ""
 
@@ -949,12 +978,12 @@ msgstr ""
 msgid "Order no.: %s"
 msgstr ""
 
-#: includes/Models/Transaction.php:365
+#: includes/Models/Transaction.php:364
 #, php-format
 msgid "Register transaction<br/><strong>Session ID</strong>: %1$s <br/><strong>Token</strong>: %2$s"
 msgstr ""
 
-#: includes/Models/Transaction.php:407
+#: includes/Models/Transaction.php:406
 #, php-format
 msgid "Payment verified<br/><strong>P24 order ID:</strong> %s"
 msgstr ""
@@ -1014,20 +1043,20 @@ msgstr ""
 msgid "Multi currency switcher"
 msgstr ""
 
-#: includes/OneClick/Client_Page.php:42
+#: includes/OneClick/Client_Page.php:44
 msgid "One click cannot be removed"
 msgstr ""
 
-#: includes/OneClick/Client_Page.php:51
+#: includes/OneClick/Client_Page.php:54
 msgid "One click successfully removed"
 msgstr ""
 
-#: includes/OneClick/Client_Page.php:94
+#: includes/OneClick/Client_Page.php:98
 msgctxt "customer account page title"
 msgid "P24 One click's"
 msgstr ""
 
-#: includes/OneClick/Client_Page.php:99
+#: includes/OneClick/Client_Page.php:103
 msgctxt "customer account menu label"
 msgid "P24 One click's"
 msgstr ""

@@ -73,35 +73,20 @@ class Card_Webhooks extends Webhook
     private function notification(): void
     {
         try {
-            if (empty($_GET[self::ORDER_ID_QUERY_KEY])) {
-                throw new \Exception('Order ID not provided');
-            }
-
-            $order_id = (int)$_GET[self::ORDER_ID_QUERY_KEY];
-            $order = wc_get_order($order_id);
-
-            if (!$order instanceof WC_Order) {
+            $order = $this->load_order();
+            if (!$order) {
                 return;
             }
-
-            $has_save_card = $order->get_meta('_p24_save_card');
-            $has_subscription = $order->get_meta('_p24_has_subscription');
 
             $notification = new Card_Notification($this->get_input());
 
             if ($notification->has_error()) {
-                $notification->reject_message && $order->add_order_note($notification->reject_message);
-            } else if (($has_save_card || $has_subscription) && !empty($notification->card)) {
-                $notification->card->set_status(Reference::STATUS_REGISTERED);
-                $card_id = Reference::save_reference($notification->card, $order);
-
-                if ($card_id && $has_subscription) {
-                    Helper::activate_subscription($order, $card_id);
-                }
+                $this->add_reject_note($order, $notification);
+            } else {
+                $this->handle_card_and_subscription($order, $notification);
             }
 
             $notification->message && $order->add_order_note($notification->message);
-
             $order->save();
         } catch (\Exception $e) {
             Logger::log($e->getMessage(), Logger::EXCEPTION);
@@ -109,6 +94,76 @@ class Card_Webhooks extends Webhook
 
         exit;
     }
+
+    private function load_order(): ?WC_Order
+    {
+        if (empty($_GET[self::ORDER_ID_QUERY_KEY])) {
+            throw new \Exception('Order ID not provided');
+        }
+
+        $order = wc_get_order((int)$_GET[self::ORDER_ID_QUERY_KEY]);
+        return $order instanceof WC_Order ? $order : null;
+    }
+
+    private function add_reject_note(WC_Order $order, Card_Notification $notification): void
+    {
+        $notification->reject_message && $order->add_order_note($notification->reject_message);
+    }
+
+
+    private function handle_card_and_subscription(WC_Order $order, Card_Notification $notification): void
+    {
+        $has_save_card = $order->get_meta('_p24_save_card');
+        $has_subscription = $order->get_meta('_p24_has_subscription');
+
+        if ((!$has_save_card && !$has_subscription) || empty($notification->card)) {
+            return;
+        }
+
+        $already_saved_card_id = $order->get_meta('_p24_card_id', true);
+        if ($already_saved_card_id) {
+            $notification->message && $order->add_order_note($notification->message);
+            $order->save();
+            return;
+        }
+
+        $notification->card->set_status(Reference::STATUS_REGISTERED);
+        $card_id = Reference::save_reference($notification->card, $order);
+
+        if ($card_id && $has_subscription) {
+            $this->create_subscriptions_for_order($order);
+            Helper::activate_subscription($order, $card_id);
+            $order->update_meta_data('_p24_card_id', $card_id);
+        }
+    }
+
+    private function create_subscriptions_for_order(WC_Order $order): void
+    {
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            if (!$product instanceof \WC_P24\Subscriptions\Product\Product) {
+                continue;
+            }
+
+            if ($item->get_meta('_p24_subscription_id')) {
+                continue;
+            }
+
+            $subscription = new \WC_P24\Models\Database\Subscription();
+            $subscription->set_customer_id((int)$order->get_customer_id());
+            $subscription->set_product_id($product->get_id());
+            $subscription->set_valid_to(new \DateTime());
+            $subscription->set_status(\WC_P24\Models\Database\Subscription::STATUS_PENDING);
+            $subscription->set_order_id((int)$order->get_id());
+
+            if ($subscription->save()) {
+                $item->update_meta_data('_p24_subscription_id', $subscription->get_id());
+            }
+        }
+    }
+
+
+
 
     private function register_card_transaction(): array
     {

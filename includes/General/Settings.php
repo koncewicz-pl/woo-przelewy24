@@ -91,13 +91,13 @@ class Settings extends Module_Settings
                 'type'  => 'checkbox',
                 'desc'  => __('Send admin new order notification right after order is created (before payment).', 'woocommerce-p24'),
             ],
-       //     [
-       //         'title'    => __('Wait for Payment Confirmation', 'woocommerce-p24'),
-       //         'desc'     => __('The customer stays on the Przelewy24 page until the transaction is confirmed. Recommended for smoother checkout and increased trust.', 'woocommerce-p24'),
-       //         'id'       => 'p24_wait_for_result',
-        //        'default'  => 'yes',
-       //         'type'     => 'checkbox',
-        //    ],
+            [
+                'title'   => __('Wait for Payment Confirmation', 'woocommerce-p24'),
+                'desc'    => __('The customer stays on the Przelewy24 page until the transaction is confirmed. Recommended for smoother checkout and increased trust.', 'woocommerce-p24'),
+                'id'      => 'p24_wait_for_result',
+                'default' => 'yes',
+                'type'    => 'checkbox',
+            ],
             [
                 'type' => 'sectionend',
             ]
@@ -122,10 +122,10 @@ class Settings extends Module_Settings
     {
         $config = Config::get_instance();
         $test_configuration = new Configuration();
-        $test_configuration->set_config($_POST['merchant_id'], $_POST['crc_key'], $_POST['reports_key'], $config->get_currency());
+        $test_configuration->set_config($_POST['merchant_id'] ?? '', $_POST['crc_key'] ?? '', $_POST['reports_key'] ?? '', $config->get_currency());
 
         $config->set_config($test_configuration);
-        $config->set_live($_POST['mode'] === 'production');
+        $config->set_live(($_POST['mode'] ?? '') === 'production');
 
         $client = new Test_Access_Resource();
 

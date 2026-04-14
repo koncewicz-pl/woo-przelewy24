@@ -33,6 +33,8 @@ class Client_Page extends Account_Page
 
         $id = (int)sanitize_key($_POST['id']);
 
+        error_log('[p24][oneclick] remove_one_click called, POST: ' . print_r($_POST, true));
+
         $references = Reference::findAll([
             'where' => ['user.ID = %d AND t.id = %d', $current_user->ID, $id],
             'limit' => 1
@@ -42,6 +44,7 @@ class Client_Page extends Account_Page
             $message = __('One click cannot be removed', 'woocommerce-p24');
             wc_add_notice($message, 'error');
             wp_send_json_error(['error' => true, 'message' => $message]);
+            error_log('[p24][oneclick] remove_one_click failed: reference not found for id ' . $id);
             exit;
         }
 
@@ -51,6 +54,7 @@ class Client_Page extends Account_Page
             $message = __('One click successfully removed', 'woocommerce-p24');
             wc_add_notice($message);
             wp_send_json_success(['success' => true, 'message' => $message]);
+            error_log('[p24][oneclick] remove_one_click success for id ' . $id);
         }
 
         exit;

@@ -21,6 +21,10 @@ class Admin
     {
         $order = wc_get_order($order_id);
 
+        if (!$order) {
+            return $item_id;
+        }
+
         if (!Multicurrency::compare_currency($order->get_currency())) {
             $config = Multicurrency::get_config($order->get_currency());
             $multiplier = $config->get_multiplier();

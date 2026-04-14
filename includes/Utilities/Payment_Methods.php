@@ -120,8 +120,12 @@ class Payment_Methods
             }, $methods) ?: [];
         }
 
-        $featured = array_filter(explode(',', $matches[1]));
-        $methods_by_id = array_combine(array_column($methods, 'id'), $methods);
+        $featured = array_filter(explode(',', $matches[1] ?? ''));
+        $ids = array_map(function ($m) {
+            return $m['id'] ?? null;
+        }, $methods);
+
+        $methods_by_id = array_combine($ids, $methods);
         $merge_all = array_merge(explode(',', $matches[2] ?? ''), array_keys($methods_by_id));
         $order = array_unique(array_filter($merge_all));
 

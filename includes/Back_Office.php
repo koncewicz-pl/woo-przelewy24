@@ -73,7 +73,8 @@ class Back_Office
 
     public function inject_ad_on_order_page()
     {
-        if (get_current_screen()->id === 'woocommerce_page_wc-orders' && isset($_GET['id'])) {
+        $screen = get_current_screen();
+        if ($screen && $screen->id === 'woocommerce_page_wc-orders' && isset($_GET['id'])) {
             $order = wc_get_order((int)$_GET['id']);
 
             $banner = trim(Render::return('admin/order-ad', ['banner' => Back_Office::get_banner(self::ON_ORDER_PAGE)]));

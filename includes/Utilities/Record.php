@@ -76,7 +76,8 @@ abstract class Record
                           WHERE t.id = %d LIMIT 1', $this->get_primary_key());
 
         try {
-            [$record] = self::db()->get_results($query, ARRAY_A);
+            $results = self::db()->get_results($query, ARRAY_A);
+            $record = $results[0] ?? null;
 
             if ($record) {
                 $this->parse($record);

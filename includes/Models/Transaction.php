@@ -295,12 +295,11 @@ class Transaction
             $data['methodRefId'] = $this->reference->get_ref_id();
         }
 
-        $settings = get_option('woocommerce_p24_settings', []);
-        $waitForResultEnabled = isset($settings['p24_wait_for_result']) && $settings['p24_wait_for_result'] === 'yes';
+        $waitForResultEnabled = get_option('p24_wait_for_result', 'no') === 'yes';
         $methodGroup = Payment_Methods::get_group_name($this->method);
 
         if ($waitForResultEnabled && !in_array($methodGroup, ['Installments', 'TraditionalTransfer'], true)) {
-            $data['waitForResult'] = 1;
+            $data['waitForResult'] = true;
         }
 
         return $data;

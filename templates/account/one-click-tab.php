@@ -70,7 +70,7 @@ use WC_P24\Models\Database\Reference;
 
                 <td data-title="<?= __('Actions', 'woocommerce-p24') ?>">
                     <?php if (!$is_blik) : ?>
-                        <button data-delete data-id="<?= $item->get_id() ?>" data-nonce="<?= $nonce ?>"
+                        <button type="button" data-delete data-id="<?= $item->get_id() ?>" data-nonce="<?= $nonce ?>"
                                 class="woocommerce-button wp-element-button button"><?= _x('Remove', 'one click', 'woocommerce-p24') ?></button>
                     <?php endif; ?>
                 </td>
@@ -79,4 +79,31 @@ use WC_P24\Models\Database\Reference;
         <?php endforeach; ?>
         </tbody>
     </table>
+
+    <script>
+      (function(){
+        const url = "<?= esc_js(add_query_arg(['action' => 'remove_one_click'], admin_url('admin-ajax.php'))) ?>";
+        document.addEventListener('click', function(e){
+          const btn = e.target.closest && e.target.closest('button[data-delete]');
+          if (!btn) return;
+          e.preventDefault();
+          try { e.stopPropagation(); } catch (err) {}
+          const id = btn.dataset.id;
+          const nonce = btn.dataset.nonce;
+          if (!url) { alert('Missing endpoint URL'); return; }
+          const body = new FormData();
+          body.append('nonce', nonce);
+          body.append('id', parseInt(id));
+          (async function(){
+            try{
+              const response = await fetch(url, { method: 'POST', body: body, credentials: 'same-origin' });
+              const text = await response.text();
+              if (!text) { if (response.ok) { window.location.reload(); return; } alert('Empty response'); return; }
+              try { const data = JSON.parse(text); if (data && (data.success === true || data.success === 'true')) { window.location.reload(); return; } alert(data && data.data && data.data.message ? data.data.message : 'Error'); } catch (err) { alert('Invalid JSON response'); }
+            }catch(err){ console.warn('p24 remove error', err); alert(err && err.message ? err.message : 'Error'); }
+          })();
+        }, true);
+      })();
+    </script>
+
 <?php endif; ?>

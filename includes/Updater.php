@@ -11,6 +11,18 @@ class Updater
 
     const VALUE_KEY = '_p24_update_data';
 
+    /** Cached successful response (seconds). */
+    private const CACHE_TTL_OK = 3600;
+
+    /** Cached failure / empty response (seconds) - avoids hammering the update server. */
+    private const CACHE_TTL_ERROR = 900;
+
+    /** Transient value meaning “remote fetch failed”; not a valid JSON payload. */
+    public const REMOTE_ERROR_PLACEHOLDER = '__p24_remote_error__';
+
+    private $cached_data = null;
+    private $data_loaded = false;
+
     public function __construct()
     {
         if (!empty(WC_P24_UPDATE_URL)) {
@@ -31,17 +43,62 @@ class Updater
 
     public function get_update_data()
     {
-        if (!($value = get_transient(self::VALUE_KEY))) {
-            try {
-                $client = new Updater_Client();
-                $value = $client->request();
-                set_transient(self::VALUE_KEY, $value, 3600);
-            } catch (Exception $e) {
-                $value = null;
-            }
+        if ($this->data_loaded) {
+            return $this->cached_data;
         }
 
+        if ($this->should_bypass_update_cache()) {
+            delete_transient(self::VALUE_KEY);
+        }
+
+        $value = get_transient(self::VALUE_KEY);
+
+        if ($value === self::REMOTE_ERROR_PLACEHOLDER) {
+            $this->data_loaded = true;
+            $this->cached_data = null;
+            return null;
+        }
+
+        if ($value !== false) {
+            $this->data_loaded = true;
+            $this->cached_data = $value;
+            return $value;
+        }
+
+        try {
+            $client = new Updater_Client();
+            $value = $client->request();
+
+            if (empty($value)) {
+                set_transient(self::VALUE_KEY, self::REMOTE_ERROR_PLACEHOLDER, self::CACHE_TTL_ERROR);
+                $this->data_loaded = true;
+                $this->cached_data = null;
+                return null;
+            }
+
+            set_transient(self::VALUE_KEY, $value, self::CACHE_TTL_OK);
+        } catch (Exception $e) {
+            set_transient(self::VALUE_KEY, self::REMOTE_ERROR_PLACEHOLDER, self::CACHE_TTL_ERROR);
+            $this->data_loaded = true;
+            $this->cached_data = null;
+            return null;
+        }
+
+        $this->data_loaded = true;
+        $this->cached_data = $value;
         return $value;
+    }
+
+    /**
+     * WordPress “Check again” (update-core.php?force-check=1) should fetch fresh metadata.
+     */
+    private function should_bypass_update_cache(): bool
+    {
+        if (!is_admin() || !current_user_can('update_plugins')) {
+            return false;
+        }
+
+        return isset($_GET['force-check']) && (string) $_GET['force-check'] === '1';
     }
 
     public function info($data, $action, $args)

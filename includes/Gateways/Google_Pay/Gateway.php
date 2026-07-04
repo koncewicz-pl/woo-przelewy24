@@ -36,7 +36,7 @@ class Gateway extends WC_Payment_Gateway
     {
         $this->id = Core::GOOGLE_PAY_IN_SHOP_METHOD;
 
-        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/svg/google-pay.svg');
+        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/svg/google-pay.svg', $this->id);
         $this->method = Payment_Methods::GOOGLE_PAY;
         $this->method_alt = Payment_Methods::GOOGLE_PAY_ALT;
         $this->description = $this->get_option('description');
@@ -132,7 +132,7 @@ class Gateway extends WC_Payment_Gateway
     {
         $sanitizer = new Sanitizer($data, [
             'regulation' => FILTER_VALIDATE_BOOLEAN,
-            'payload' => FILTER_SANITIZE_STRING,
+            'payload' => Sanitizer::sanitize_base64_payload_as_filter(),
         ]);
 
         return $sanitizer->run();
@@ -220,7 +220,13 @@ class Gateway extends WC_Payment_Gateway
                 'error' => [
                     'unavailable' => __('This payment method is unavailable, for this browser', 'woocommerce-p24'),
                     'rules' => __('You have to accept the terms and conditions for using the chosen method', 'woocommerce-p24'),
-                ]
+                    'generic' => _x(
+                        'We could not complete this payment. Please try again or choose a different payment method.',
+                        'Shown when payment or 3DS fails without a specific reason',
+                        'woocommerce-p24'
+                    ),
+                ],
+                'waiting_3ds' => __('Please wait… we are preparing the payment verification. Do not close this window - the confirmation screen will appear shortly.', 'woocommerce-p24'),
             ]
         ];
     }

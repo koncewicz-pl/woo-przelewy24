@@ -105,6 +105,7 @@ class Refund
                     'orderId' => $this->order_id,
                     'sessionId' => $this->session_id,
                     'amount' => $this->amount,
+                    /* translators: %s: WooCommerce order number. */
                     'description' => sprintf(__('Refund to order no. %s', 'woocommerce-p24'), $this->order->get_order_number()),
                 ]
             ],
@@ -193,8 +194,6 @@ class Refund
         $this->order->update_meta_data(self::REFUND_UUID_PREFIX . $request_id, $refund_id);
         $this->order->update_meta_data(self::REFUND_LINE_ITEMS_PREFIX . $request_id, $this->line_items);
         $this->order->update_meta_data(self::REFUND_PENDING, $this->pending_refunds);
-
-        error_log('[P24 Refund] Stored refund request - ID: ' . $request_id . ', Amount: ' . $this->amount . ', Line Items: ' . json_encode($this->line_items));
     }
 
     private function remove_pending_refund($request_id): void
@@ -244,8 +243,6 @@ class Refund
             $refund_amount_higher = Helper::to_higher_unit($notification->amount);
             $stored_line_items = $this->get_stored_line_items($notification->request_id);
 
-            error_log('[P24 Refund] Verifying refund - Request ID: ' . $notification->request_id . ', Stored Line Items: ' . json_encode($stored_line_items));
-
             $attributes = [
                 'amount' => $refund_amount_higher,
                 'order_id' => $this->order->get_id(),
@@ -257,7 +254,6 @@ class Refund
             if (!empty($stored_line_items)) {
                 $attributes['line_items'] = $stored_line_items;
                 $attributes['restock_items'] = true;
-                error_log('[P24 Refund] Creating refund with ' . count($stored_line_items) . ' items: ' . json_encode($stored_line_items));
             }
 
             if ($reason) {
@@ -268,9 +264,6 @@ class Refund
 
             if ($refund instanceof \WP_Error) {
                 $this->order->add_order_note(__('Refund was rejected', 'woocommerce-p24'));
-                error_log('[P24 Refund] Refund creation failed for order ' . $this->order->get_id() . ': ' . $refund->get_error_message());
-            } else {
-                error_log('[P24 Refund] Refund created successfully for order #' . $this->order->get_id() . ' with ID: ' . $refund->get_id());
             }
         } else {
             $message = $this->refund_notes()[$notification->status] ?? __('Refund was rejected', 'woocommerce-p24');

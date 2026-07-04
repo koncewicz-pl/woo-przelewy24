@@ -18,29 +18,57 @@ use WC_P24\Migrations\Migration_Manager;
 use WC_P24\Multicurrency\Multicurrency;
 use WC_P24\OneClick\One_Clicks;
 use WC_P24\Subscriptions\Subscriptions;
+use WC_P24\Utilities\Payment_Methods;
 use WC_P24\Wizard\Wizard;
 use WC_P24\Hooks\Thankyou_Status_Check;
 use WC_P24\AJAX\Check_Payment_Status;
 use WC_P24\Emails\SendMailToAdminOnNewOrder;
 class Plugin
 {
+    /**
+     * Single Gateways_Manager instance: created early on plugins_loaded (WooCommerce Blocks registration),
+     * or on init if the early bootstrap did not run.
+     */
+    private ?Gateways_Manager $gateways_manager = null;
 
     public function __construct()
     {
-        add_action('plugins_loaded', [$this, 'init']);
+        // WooCommerce loads packages (Blocks) on plugins_loaded:10 and fires woocommerce_blocks_loaded.
+        // Gateways_Manager must register hooks before that - hence priority 9.
+        add_action('plugins_loaded', [$this, 'bootstrap_payment_gateways_early'], 9);
+
+        // WordPress 6.7+ warns when load_plugin_textdomain runs too early; init:0 is safe.
+        add_action('init', [$this, 'load_textdomain'], 0);
+
+        // Remaining plugin bootstrap (no second Gateways_Manager if already created above).
+        add_action('init', [$this, 'bootstrap'], 10);
         add_action('activate_' . WC_P24_PLUGIN_BASENAME, [$this, 'on_activate']);
         add_action('activated_plugin', [$this, 'after_activate']);
-        add_action('init', [$this, 'later_init']);
+        add_action('init', [$this, 'later_init'], 20);
+    }
+
+    public function load_textdomain(): void
+    {
+        // Avoid "Translation loaded too early" (WP 6.7+); do not call before init.
+        if (!is_textdomain_loaded('woocommerce-p24')) {
+            load_plugin_textdomain('woocommerce-p24', false, dirname(WC_P24_PLUGIN_BASENAME) . '/languages');
+        }
     }
 
     public function on_activate(): void
     {
+        $this->load_textdomain();
+
         if (!Compatibility_Checker::check()) return;
 
         (new Installments_Settings(true))->set_defaults();
 
         new Migration_Manager();
         Encryption_Settings::generate_keys_on_active();
+
+        // Clear payment methods cache and resolve BLIK method on plugin activation
+        Payment_Methods::clear_payment_methods_cache();
+        Payment_Methods::sync_blik_level0_method_id();
     }
 
     public function after_activate($plugin)
@@ -67,16 +95,43 @@ class Plugin
             (new Installments_Settings(true))->set_defaults();
 
             update_option(Core::INSTALLED_VERSION, $version, true);
-        }
 
+            // Re-resolve BLIK method after upgrade — account may have switched 181↔342
+            Payment_Methods::clear_payment_methods_cache();
+            Payment_Methods::sync_blik_level0_method_id();
+        }
     }
 
-    public function init(): void
+    /**
+     * Early bootstrap for WooCommerce integration and block checkout only.
+     *
+     * Issue: running the full bootstrap on init meant woocommerce_blocks_loaded had already fired
+     * before block payment methods were registered - the block checkout payment list was empty.
+     */
+    public function bootstrap_payment_gateways_early(): void
     {
-        if (!is_textdomain_loaded('woocommerce-p24')) {
-
-            load_plugin_textdomain('woocommerce-p24', false, dirname(WC_P24_PLUGIN_BASENAME) . '/languages');
+        if ($this->gateways_manager !== null) {
+            return;
         }
+
+        if (!defined('WC_VERSION')) {
+            return;
+        }
+
+        if (!Compatibility_Checker::check()) {
+            return;
+        }
+
+        $this->gateways_manager = new Gateways_Manager();
+
+        // Edge case: blocks_loaded already ran in this request - register payment integrations immediately.
+        if (did_action('woocommerce_blocks_loaded')) {
+            $this->gateways_manager->add_payment_blocks();
+        }
+    }
+
+    public function bootstrap(): void
+    {
         $this->after_update();
 
         if (!Compatibility_Checker::check()) return;
@@ -92,7 +147,11 @@ class Plugin
         new Core();
         new Settings();
         new Encryption_Settings();
-        new Gateways_Manager();
+
+        // Avoid instantiating Gateways_Manager twice (duplicate hooks from General_Webhooks / Fee_Manager, etc.).
+        if ($this->gateways_manager === null) {
+            $this->gateways_manager = new Gateways_Manager();
+        }
 
         new Multicurrency();
         new Subscriptions();
@@ -108,5 +167,9 @@ class Plugin
 
         new SendMailToAdminOnNewOrder();
 
+        add_action('p24_sync_blik_method', [Payment_Methods::class, 'sync_blik_level0_method_id']);
+        if (!wp_next_scheduled('p24_sync_blik_method')) {
+            wp_schedule_event(time(), 'daily', 'p24_sync_blik_method');
+        }
     }
 }

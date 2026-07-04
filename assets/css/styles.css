@@ -116,6 +116,31 @@
   font-size: 75%;
 }
 
+.p24-account-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.p24-account-table thead th {
+  font-weight: 600;
+}
+.p24-account-table td,
+.p24-account-table th {
+  vertical-align: top;
+}
+.p24-account-table .p24-col-actions,
+.p24-account-table .p24-cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.p24-account-table .p24-col-next-payment,
+.p24-account-table .p24-cell-next-payment {
+  white-space: nowrap;
+}
+.p24-account-table .p24-cell-downloads a {
+  display: inline-block;
+  margin: 2px 0;
+}
+
 
 .p24-waiting {
   position: absolute;
@@ -217,6 +242,23 @@
 input[id^="payment_method_p24-"] + label img { max-height: 30px; }
 .p24-payment-container .wc-block-components-notice-banner:first-child { margin-top: 0; }
 
+/* Checkout blocks: prevent checkbox rows from overlapping */
+.p24-payment-container .p24-checkbox + .p24-checkbox {
+  margin-top: 10px;
+}
+.p24-payment-container .p24-checkbox .wc-block-components-checkbox {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.p24-payment-container .p24-checkbox .wc-block-components-checkbox__label {
+  line-height: 1.35;
+}
+.p24-payment-container .p24-checkbox .wc-block-components-checkbox__input {
+  margin-top: 2px;
+}
+
 p24-installment {
   margin: 20px 0;
   display: block;
@@ -271,6 +313,61 @@ p24-installment[show-modal="true"] { cursor: pointer; }
 #p24-3ds-modal.active .modal-content {
   transform: translateY(0px);
   opacity: 1;
+}
+
+/* 3DS Loader styles */
+.p24-3ds-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.p24-3ds-overlay.hidden {
+  display: none !important;
+}
+
+.p24-3ds-loader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 40px 20px;
+  text-align: center;
+  z-index: 10;
+}
+
+.p24-3ds-loader-content .loader {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #d1001f;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: p24-spin 1s linear infinite;
+}
+
+@keyframes p24-spin {
+  to { transform: rotate(360deg); }
+}
+
+.p24-3ds-loader-message {
+  max-width: 400px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #fff;
+  margin: 0;
+  padding: 0 10px;
+}
+
+#p24-3ds-loader.hidden {
+  display: none !important;
 }
 
 #p24-3ds-iframe-wrapper {
@@ -442,10 +539,36 @@ p24-installment[show-modal="true"] { cursor: pointer; }
   }
   .p24-1clicks__new-card-icon { width: 16px; height: 16px; }
 
+  .p24-1clicks__items {
+    width: 100%;
+    padding: 0 8px;
+  }
 
   .p24-1clicks__items .p24-1click--card {
     width: 100%;
-    max-width: 220px;
+    max-width: 100%;
+    padding: 12px 14px;
+    flex-direction: row;
+    aspect-ratio: auto;
+  }
+
+  .p24-1click--card__number {
+    font-size: 15px;
+    margin-bottom: 0;
+    flex: 1;
+  }
+
+  .p24-1click--card__valid {
+    position: static;
+    font-size: 12px;
+    margin-left: auto;
+    padding-left: 10px;
+    text-align: right;
+  }
+
+  .p24-1click--card__logo {
+    position: static;
+    margin-bottom: 0;
   }
 }
 
@@ -486,4 +609,169 @@ p24-installment[show-modal="true"] { cursor: pointer; }
     padding: 16px;
     max-height: 92vh;
   }
+}
+
+/* Subscription button styles */
+.subscription-button {
+  display: inline-block;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.subscription-button:hover {
+  text-decoration: none;
+}
+
+.subscription-button--login {
+  background-color: #f0f0f0;
+  color: #333;
+  border-color: #ccc;
+}
+
+.subscription-button--login:hover {
+  background-color: #e8e8e8;
+  border-color: #999;
+}
+
+.subscription-button--start {
+  background-color: #0073aa;
+  color: #fff;
+  border-color: #0073aa;
+}
+
+.subscription-button--start:hover {
+  background-color: #005a87;
+  border-color: #005a87;
+}
+
+.subscription-button--manage {
+  background-color: #28a745;
+  color: #fff;
+  border-color: #28a745;
+}
+
+.subscription-button--manage:hover {
+  background-color: #218838;
+  border-color: #218838;
+}
+
+/* Subscription product UI (shared accent) */
+.subscription-period-info,
+.subscription-extra-box {
+  --p24-sub-accent: #0073aa;
+  --p24-sub-accent-hover: #005a87;
+  --p24-sub-accent-bg: #e8f4f8;
+  --p24-sub-surface: #f8fafb;
+  --p24-sub-border: #d8e6ec;
+  --p24-sub-text: #1e293b;
+  --p24-sub-text-muted: #475569;
+}
+
+.subscription-svg-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.subscription-period-info {
+  margin: 0.75rem 0 0.5rem;
+}
+
+.subscription-period-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--p24-sub-accent-bg);
+  color: var(--p24-sub-accent);
+  padding: 0.5rem 0.875rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  border: 1px solid var(--p24-sub-border);
+}
+
+.subscription-period-badge__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--p24-sub-accent);
+}
+
+.subscription-period-badge__icon .subscription-svg-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.subscription-extra-box {
+  background-color: var(--p24-sub-surface);
+  border: 1px solid var(--p24-sub-border);
+  border-left: 4px solid var(--p24-sub-accent);
+  border-radius: 12px;
+  padding: 1.25rem 1.375rem;
+  margin: 1.25rem 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.subscription-extra-box__title {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--p24-sub-text);
+}
+
+.subscription-extra-box__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.subscription-extra-box__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--p24-sub-text-muted);
+}
+
+.subscription-extra-box__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background-color: var(--p24-sub-accent-bg);
+  color: var(--p24-sub-accent);
+}
+
+.subscription-extra-box__text {
+  display: block;
+  padding-top: 0.2rem;
+  color: var(--p24-sub-text-muted);
+}
+
+@media (max-width: 480px) {
+  .subscription-extra-box {
+    padding: 1rem 1.125rem;
+  }
+
+  .subscription-extra-box__item {
+    gap: 0.625rem;
+  }
+}
+
+.subscription-button-wrapper {
+  margin: 15px 0;
 }

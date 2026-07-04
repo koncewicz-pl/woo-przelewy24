@@ -49,6 +49,7 @@ trait Card_Legacy_Support
         $result['i18n']['label']['regulation'] = $result['i18n']['label']['regulation'] ?? __('I accept the terms and conditions.', 'woocommerce-p24');
         $result['i18n']['error'] = $result['i18n']['error'] ?? [];
         $result['i18n']['error']['rules'] = $result['i18n']['error']['rules'] ?? __('You must accept the terms and conditions.', 'woocommerce-p24');
+        $result['i18n']['error']['recurring_consent_required'] = $result['i18n']['error']['recurring_consent_required'] ?? __('You must agree to recurring card charges to purchase a subscription.', 'woocommerce-p24');
 
         $result['oneClick'] = $result['oneClick'] ?? [];
         $result['oneClick']['enabled'] = $result['oneClick']['enabled'] ?? false;

@@ -6,7 +6,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-use WC_P24\Gateways\Blik\GooglePay_Webhooks;
+use WC_P24\Core;
+use WC_P24\Gateways\Card\Gateway as Card_Gateway;
 use WC_P24\Models\Refund;
 use WC_P24\Models\Simple\Notification;
 use WC_P24\Models\Simple\Refund_Notification;
@@ -60,16 +61,24 @@ class General_Webhooks extends Webhook
 
     private function verify_transaction(): void
     {
+        $order_id = null;
         try {
             $order_id = $this->get_order_id();
             $notification = new Notification($this->get_input());
             $transaction = new Transaction($order_id);
 
             Logger::log('[P24] Notification received for order ' . $order_id);
-            $transaction->verify($notification);
+            $verified = $transaction->verify($notification);
             Logger::log('[P24] Verify executed for order ' . $order_id);
 
-            do_action('przelewy24_after_verify_transaction', $transaction);
+            if ($verified) {
+                do_action('przelewy24_after_verify_transaction', $transaction);
+            } elseif (function_exists('WC') && WC()->payment_gateways()) {
+                $cardGateway = WC()->payment_gateways()->payment_gateways()[Core::CARD_IN_SHOP_METHOD] ?? null;
+                if ($cardGateway instanceof Card_Gateway && $transaction->order->get_meta('_p24_save_card', true)) {
+                    $cardGateway->save_card_reference($transaction);
+                }
+            }
 
             status_header(200);
             echo 'OK';

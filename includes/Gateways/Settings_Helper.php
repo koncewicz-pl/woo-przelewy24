@@ -48,6 +48,10 @@ trait Settings_Helper
                 'type' => 'number',
                 'title' => __('Value of fee', 'woocommerce-p24'),
                 'description' => __('Additional cost added to the order at checkout', 'woocommerce-p24'),
+                'custom_attributes' => [
+                    'step' => '0.01',
+                    'min' => '0',
+                ],
             ]
         ];
     }

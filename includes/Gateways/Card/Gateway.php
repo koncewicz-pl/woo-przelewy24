@@ -36,12 +36,13 @@ class Gateway extends WC_Payment_Gateway
     public function __construct()
     {
         $this->id = Core::CARD_IN_SHOP_METHOD;
-        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/card.svg');
+        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/card.svg', $this->id);
         $this->method = Payment_Methods::CARD_PAYMENT;
         $this->method_alt = Payment_Methods::CARD_PAYMENT_ALT;
         $this->description = $this->get_option('description');
         $this->supports = ['products', 'refunds', 'p24-subscription'];
         $this->method_title = __('Przelewy24 - Card payment', 'woocommerce-p24');
+        /* translators: %s: URL to Przelewy24 general settings in WooCommerce admin. */
         $this->method_description = sprintf(__('Card payment option on the shop <br /><a href="%s">General configuration</a>', 'woocommerce-p24'), Core::get_settings_url());
         $this->title = $this->get_option('title') ?: __('Card payment', 'woocommerce-p24');
 
@@ -137,6 +138,7 @@ class Gateway extends WC_Payment_Gateway
                         "contentEnabled": { "enabled": false, "checkboxEnabled": false }
                     }
                 }',
+                /* translators: %s: URL to Przelewy24 developer documentation for card widget styling (JSON). */
                 'description' => sprintf(__('Widget styling settings in JSON format, detailed documentation available <a href="%s" target="_blank">here</a>', 'woocommerce-p24'), 'https://developers.przelewy24.pl/extended/index.php?pl#tag/Inicjalizacja-formularza/Stylowanie-oraz-opcje-formularza'),
             ]
         ], $this->fee_settings());
@@ -166,6 +168,8 @@ class Gateway extends WC_Payment_Gateway
             'type' => Sanitizer::sanitize_key_as_filter(),
             'save' => FILTER_VALIDATE_BOOLEAN,
             'oneclick' => FILTER_SANITIZE_NUMBER_INT,
+            'recurringConsent' => FILTER_VALIDATE_BOOLEAN,
+            'recurringConsentAt' => Sanitizer::sanitize_string_as_filter(),
         ]);
 
         return $sanitizer->run();
@@ -196,6 +200,67 @@ class Gateway extends WC_Payment_Gateway
         }
     }
 
+    /**
+     * @param array<string, mixed> $payment_data Raw payment payload (before narrowing to sanitized keys).
+     */
+    private function validate_card_ref_id(array $payment_data): void
+    {
+        $ref_id = $this->extract_card_ref_id($payment_data);
+
+        if ($ref_id === '') {
+            throw new \Exception(
+                __('Card tokenization reference (refId) is missing. Please tokenize the card again and retry payment.', 'woocommerce-p24')
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payment_data
+     */
+    private function extract_card_ref_id(array $payment_data): string
+    {
+        foreach (['refId', 'refid', 'ref_id'] as $key) {
+            if (!empty($payment_data[$key]) && is_scalar($payment_data[$key])) {
+                return Sanitizer::sanitize_token((string) $payment_data[$key]);
+            }
+        }
+
+        if (!empty($payment_data['cardData'])) {
+            $card_data = $payment_data['cardData'];
+            if (is_string($card_data)) {
+                $decoded = json_decode($card_data, true);
+                $card_data = is_array($decoded) ? $decoded : [];
+            }
+            if (is_array($card_data)) {
+                foreach (['refId', 'refid', 'ref_id'] as $key) {
+                    if (!empty($card_data[$key]) && is_scalar($card_data[$key])) {
+                        return Sanitizer::sanitize_token((string) $card_data[$key]);
+                    }
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Store API may send booleans or integers; filter_var( ..., FILTER_VALIDATE_BOOLEAN ) mishandles those.
+     */
+    private function normalize_payment_boolean_flags(array &$data): void
+    {
+        foreach (['regulation', 'save', 'recurringConsent'] as $key) {
+            if (!array_key_exists($key, $data)) {
+                continue;
+            }
+            $v = $data[$key];
+            if (is_bool($v)) {
+                $data[$key] = $v ? '1' : '0';
+            } elseif (is_int($v) || is_float($v)) {
+                $data[$key] = ((int) $v) !== 0 ? '1' : '0';
+            }
+        }
+    }
+
     public function payment(\WC_Order $order, array $payment_data = []): array
     {
         if (!empty($payment_data['paymentMethodData']) && is_array($payment_data['paymentMethodData'])) {
@@ -217,8 +282,25 @@ class Gateway extends WC_Payment_Gateway
         }
 
         $card_data = $payment_data;
+
+        $this->normalize_payment_boolean_flags($payment_data);
+
         $payment_data = $this->sanitize($payment_data);
+
+        if (Helper::order_has_subscription_product($order)) {
+            $subscription_consent = !empty($payment_data['recurringConsent']) || !empty($payment_data['save']);
+            if (!$subscription_consent) {
+                throw new \Exception(
+                    __('You must agree to recurring card charges for a subscription order.', 'woocommerce-p24')
+                );
+            }
+        }
+
         $this->validate($payment_data);
+
+        if ($payment_data['type'] === 'card-data') {
+            $this->validate_card_ref_id($card_data);
+        }
 
         $result = [
             'redirect' => $order->get_checkout_order_received_url(),
@@ -227,10 +309,18 @@ class Gateway extends WC_Payment_Gateway
 
         $type = $payment_data['type'];
         $save = $payment_data['save'];
+        $recurring_consent = !empty($payment_data['recurringConsent']);
+        $recurring_consent_at = !empty($payment_data['recurringConsentAt']) ? sanitize_text_field($payment_data['recurringConsentAt']) : '';
 
-        if (Helper::order_has_subscription_product($order) && $save) {
+        if (Helper::order_has_subscription_product($order) && ($save || $recurring_consent)) {
             $order->update_meta_data('_p24_recurring_consent', 'yes');
-            $order->update_meta_data('_p24_recurring_consent_at', current_time('mysql'));
+
+            if ($recurring_consent && $recurring_consent_at) {
+                $order->update_meta_data('_p24_recurring_consent_at', $recurring_consent_at);
+            } else {
+                $order->update_meta_data('_p24_recurring_consent_at', current_time('mysql'));
+            }
+
             $order->save();
         }
 
@@ -241,6 +331,8 @@ class Gateway extends WC_Payment_Gateway
 
         $card_payment_type = Transaction::CARD_STANDARD;
 
+        // Recurring registration (first charge for a subscription product): P24 expects transactionType `initial`,
+        // whether the shopper tokenizes a new card (`card-data`) or pays with a saved reference (`one-click`).
         if (Helper::order_has_subscription_product($transaction->order)) {
             $card_payment_type = Transaction::CARD_INITIAL;
         } elseif ($type === 'c2p') {
@@ -251,26 +343,46 @@ class Gateway extends WC_Payment_Gateway
             $card_payment_type = Transaction::CARD_INITIAL;
         }
 
+        // Orders created in Subscription::renew() carry this meta: merchant recurring debit uses `recurring` + doPayment.
+        $is_subscription_renew_order = (bool) $order->get_meta('_p24_subscription_renew', true);
+        $finalize_with_do_payment = false;
+
         switch ($type) {
             case 'card-data':
-                $transaction->set_card(new Card_Simple($card_data), $card_payment_type);
+                $effective_card_type = $is_subscription_renew_order ? Transaction::CARD_RECURRING : $card_payment_type;
+                $transaction->set_card(new Card_Simple($card_data), $effective_card_type);
+                if ($is_subscription_renew_order) {
+                    $finalize_with_do_payment = true;
+                }
                 break;
 
             case 'one-click':
-                if ($this->one_click_enabled()) {
-                    $one_click_id = (int) $payment_data['oneclick'];
-                    $reference = Reference::get_and_check($one_click_id, $order->get_customer_id());
+                if (!$this->one_click_enabled()) {
+                    throw new \Exception(__('One-click card payment is disabled in the gateway settings.', 'woocommerce-p24'));
+                }
+                $one_click_id = (int) $payment_data['oneclick'];
+                $reference = Reference::get_and_check($one_click_id, (int) $order->get_customer_id());
 
-                    if ($reference) {
-                        $transaction->set_one_click(Transaction::ONE_CLICK_CARD);
-                        $transaction->set_card($reference->to_card_simple(), Transaction::CARD_ONE_CLICK);
-                    }
+                if (!$reference) {
+                    throw new \Exception(__('The selected saved card is not available for this order or account.', 'woocommerce-p24'));
+                }
+
+                if ($is_subscription_renew_order) {
+                    $transaction->set_card($reference->to_card_simple(), Transaction::CARD_RECURRING);
+                    $finalize_with_do_payment = true;
+                } else {
+                    $transaction->set_one_click(Transaction::ONE_CLICK_CARD);
+                    $type_to_set = $card_payment_type === Transaction::CARD_INITIAL ? Transaction::CARD_INITIAL : Transaction::CARD_ONE_CLICK;
+                    $transaction->set_card($reference->to_card_simple(), $type_to_set);
                 }
                 break;
         }
 
         $transaction->register();
-        $transaction->charge_card(true, true);
+        if ($finalize_with_do_payment) {
+            $transaction->do_payment();
+        }
+        // Whitelabel continues in the browser; renewals use doPayment above.
 
         $result['token'] = $transaction->get_token();
         $result['success'] = true;
@@ -322,13 +434,7 @@ class Gateway extends WC_Payment_Gateway
             }, $one_click_items);
         }
 
-        $recurring = false;
-        $order_id = isset(WC()->session) ? WC()->session->get('store_api_draft_order') : null;
-        $order = $order_id ? wc_get_order($order_id) : false;
-
-        if ($order instanceof \WC_Order) {
-            $recurring = Helper::order_has_subscription_product($order);
-        }
+        $recurring = Helper::cart_has_subscription_product();
 
         return [
             'mode' => $config->get_mode_prefix(),
@@ -348,12 +454,18 @@ class Gateway extends WC_Payment_Gateway
                     ),
                 ],
                 'error' => [
-                    'general' => _x('Unknown error has occurred', 'Card in the shop', 'woocommerce-p24'),
+                    'generic' => _x(
+                        'We could not complete this payment. Please try again or choose a different payment method.',
+                        'Shown when payment or 3DS fails without a specific reason',
+                        'woocommerce-p24'
+                    ),
                     'rules' => __('You have to accept the terms and conditions for using the chosen method', 'woocommerce-p24'),
+                    'recurring_consent_required' => __('You must agree to recurring card charges to purchase a subscription.', 'woocommerce-p24'),
                 ],
                 'use_saved' => __('Use saved payment methods - on-click', 'woocommerce-p24'),
                 'or' => __('or use new card details', 'woocommerce-p24'),
                 'use_new_card' => __('Use new card', 'woocommerce-p24'),
+                'waiting_3ds' => __('Please wait… we are preparing the payment verification. Do not close this window - the confirmation screen will appear shortly.', 'woocommerce-p24'),
             ],
             'recurring' => $recurring,
             'hasSubscription' => $recurring,

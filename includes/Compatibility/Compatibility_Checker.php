@@ -13,7 +13,7 @@ class Compatibility_Checker
     public static function check(): bool
     {
         $php_version = self::check_php_version('7.4.0');
-        $woocommerce_version = self::check_wc_version('8.0.0');
+        $woocommerce_version = self::check_wc_version('9.0.0');
 
         return $php_version && $woocommerce_version;
     }

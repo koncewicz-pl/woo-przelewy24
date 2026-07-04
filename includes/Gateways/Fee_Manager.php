@@ -20,11 +20,15 @@ class Fee_Manager
 
     public function legacy_change_payment_method(): void
     {
-        wc_enqueue_js("jQuery(function($){
-                           $('form.checkout').on('change', 'input[name=payment_method]', function(){
-                               $(document.body).trigger('update_checkout');
-                           });
-                       });");
+        $script = "jQuery(function($){
+            $('form.checkout').on('change', 'input[name=payment_method]', function(){
+                $(document.body).trigger('update_checkout');
+            });
+        });";
+
+        wp_register_script('p24-fee-manager', '', ['jquery'], null, true);
+        wp_enqueue_script('p24-fee-manager');
+        wp_add_inline_script('p24-fee-manager', $script);
     }
 
     private function get_chosen_payment_method(): string

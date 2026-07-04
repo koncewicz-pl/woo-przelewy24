@@ -115,10 +115,6 @@ trait Payment_Helpers
             ];
         }
 
-        if (!empty($line_items)) {
-            error_log('[P24 Refund] Extracted line items from request: ' . json_encode($line_items));
-        }
-
         return !empty($line_items) ? $line_items : null;
     }
 

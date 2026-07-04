@@ -3,12 +3,13 @@
  * Plugin Name: Przelewy24 Payment Gateway
  * Plugin URI: https://www.przelewy24.pl/pobierz
  * Description: Przelewy24 Payment gateway for WooCommerce.
- * Version: 1.0.18
+ * Version: 1.1.0
  * Author: PayPro S.A.
  * Author URI: https://www.przelewy24.pl/
  * Text Domain: woocommerce-p24
  * Requires at least: 6.5
  * Requires PHP: 7.4
+ * Requires Plugins: woocommerce
  * WC requires at least: 9.0
  */
 

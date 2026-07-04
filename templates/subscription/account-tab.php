@@ -20,22 +20,22 @@ use WC_P24\Models\Database\Subscription;
     </div>
 <?php else: ?>
 
-    <table class="shop_table shop_table_responsive account-p24-subscriptions-table">
+    <table class="shop_table shop_table_responsive account-p24-subscriptions-table p24-account-table">
         <thead>
         <tr>
-            <th>
+            <th class="p24-col-product">
                 <span class="nobr"><?= __('Product', 'woocommerce-p24') ?></span>
             </th>
-            <th>
-                <span class="nobr"><?= __('Valid to', 'woocommerce-p24') ?></span>
+            <th class="p24-col-next-payment">
+                <span class="nobr"><?= __('Next payment', 'woocommerce-p24') ?></span>
             </th>
-            <th>
+            <th class="p24-col-status">
                 <span class="nobr"><?= __('Status', 'woocommerce-p24') ?></span>
             </th>
-            <th>
+            <th class="p24-col-downloads">
                 <span class="nobr"><?= __('Downloads', 'woocommerce-p24') ?></span>
             </th>
-            <th>
+            <th class="p24-col-actions">
                 <span class="nobr"><?= __('Actions', 'woocommerce-p24') ?></span>
             </th>
         </tr>
@@ -44,11 +44,11 @@ use WC_P24\Models\Database\Subscription;
         <tbody>
         <?php foreach ($subscriptions as $subscription): ?>
             <tr>
-                <td data-title="<?= __('Product', 'woocommerce-p24') ?>">
+                <td class="p24-cell-product" data-title="<?= __('Product', 'woocommerce-p24') ?>">
                     <a href="<?= get_permalink($subscription->get_product_id()) ?>"><?= $subscription->product_title ?></a><br />
                 </td>
 
-                <td data-title="<?= __('Valid to', 'woocommerce-p24') ?>">
+                <td class="p24-cell-next-payment" data-title="<?= __('Next payment', 'woocommerce-p24') ?>">
                     <?php if (!$subscription->is_pending()): ?>
                         <time datetime="<?= $subscription->get_valid_to()->format('c') ?>">
                             <?= $subscription->get_valid_to()->format('d-m-Y') ?>
@@ -56,11 +56,11 @@ use WC_P24\Models\Database\Subscription;
                     <?php endif; ?>
                 </td>
 
-                <td data-title="<?= __('Status', 'woocommerce-p24') ?>">
+                <td class="p24-cell-status" data-title="<?= __('Status', 'woocommerce-p24') ?>">
                     <?= $subscription->get_status_label() ?>
                 </td>
 
-                <td data-title="<?= __('Downloads', 'woocommerce-p24') ?>">
+                <td class="p24-cell-downloads" data-title="<?= __('Downloads', 'woocommerce-p24') ?>">
                     <?php if ($subscription->is_available()): ?>
                         <?php foreach ($subscription->get_downloads() as $download): ?>
                             <a href="<?= $download['download_url'] ?>"><?= $download['download_name'] ?></a><br />
@@ -68,12 +68,12 @@ use WC_P24\Models\Database\Subscription;
                     <?php endif; ?>
                 </td>
 
-                <?php if ($subscription->is_cancelable()): ?>
-                    <td data-title="<?= __('Actions', 'woocommerce-p24') ?>">
+                <td class="p24-cell-actions" data-title="<?= __('Actions', 'woocommerce-p24') ?>">
+                    <?php if ($subscription->is_cancelable()): ?>
                         <button data-delete data-id="<?= $subscription->get_id() ?>" data-nonce="<?= $nonce ?>"
                                 class="woocommerce-button wp-element-button button"><?= _x('Cancel', 'subscription', 'woocommerce-p24') ?></button>
-                    </td>
-                <?php endif; ?>
+                    <?php endif; ?>
+                </td>
             </tr>
         <?php endforeach; ?>
         </tbody>

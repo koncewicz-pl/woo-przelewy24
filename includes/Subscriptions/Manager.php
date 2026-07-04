@@ -5,7 +5,6 @@ namespace WC_P24\Subscriptions;
 use WC_Order;
 use WC_P24\API\Resources\Card_Resource;
 use WC_P24\Core;
-use WC_P24\Gateways\Gateways_Manager;
 use WC_P24\Models\Database\Reference;
 use WC_P24\Models\Database\Subscription;
 use WC_P24\Models\Simple\Card_Simple;
@@ -29,6 +28,7 @@ class Manager
         }
 
         add_action('przelewy24_cron_event_renew', [$this, 'find_subscription_to_extend']);
+        add_action('p24_renew_subscription', [$this, 'find_subscription_to_extend']);
 
         add_action('woocommerce_order_status_pending', [$this, 'create_pending_subscriptions_on_pending_order'], 10, 2);
         add_action('woocommerce_before_delete_order_item', [$this, 'on_remove_order_item']);
@@ -36,7 +36,8 @@ class Manager
 
         add_action('przelewy24_after_verify_transaction', [$this, 'handle_subscriptions'], 20);
 
-        add_action('init', [$this, 'notice']);
+        // After Plugin::bootstrap (init:10); same-priority init callbacks added during bootstrap may not run.
+        add_action('init', [$this, 'notice'], 20);
     }
 
     public function cron_schedules($schedules): array
@@ -57,10 +58,20 @@ class Manager
     public function notice(): void
     {
         new Notice(__('Subscription Przelewy24 requires <strong>Przelewy24 - Card payment</strong> to be enabled', 'woocommerce-p24'), Notice::INFO, false, 999, function () {
-            $isset = isset(Gateways_Manager::$gateways[Core::CARD_IN_SHOP_METHOD]);
-            $card_gateway_is_enabled = $isset && Gateways_Manager::$gateways[Core::CARD_IN_SHOP_METHOD]->is_enabled();
+            if (!Subscriptions::is_enabled()) {
+                return false;
+            }
 
-            return Subscriptions::is_enabled() && !$card_gateway_is_enabled;
+            // Gateways_Manager::$gateways is empty in admin until WC loads gateways (e.g. Plugins screen).
+            if (!function_exists('WC') || !WC()) {
+                return false;
+            }
+
+            $payment_gateways = WC()->payment_gateways()->payment_gateways();
+            $card_gateway = $payment_gateways[Core::CARD_IN_SHOP_METHOD] ?? null;
+            $card_gateway_is_enabled = $card_gateway && $card_gateway->is_enabled();
+
+            return !$card_gateway_is_enabled;
         });
     }
 
@@ -113,7 +124,7 @@ class Manager
         if (!$subscription_id) return;
 
         $subscription = Subscription::get($subscription_id);
-        $subscription && $subscription->cancel();
+        $subscription && $subscription->cancel(Subscription::CANCELLED_BY_SYSTEM);
     }
 
     public function create_pending_subscriptions_on_pending_order($order_id, $order): void
@@ -135,6 +146,8 @@ class Manager
                     $subscription->set_valid_to(new \DateTime());
                     $subscription->set_status(Subscription::STATUS_PENDING);
                     $subscription->set_order_id((int)$order_id);
+                    $subscription->set_created_at(new \DateTime());
+                    $subscription->set_start_order_id((int)$order_id);
 
                     if ($subscription->save()) {
                         $item->update_meta_data('_p24_subscription_id', $subscription->get_id());
@@ -153,23 +166,68 @@ class Manager
 
     public function find_subscription_to_extend(): void
     {
-        $now = new \DateTime();
-        $now->modify('+' . Subscriptions::days_to_renew() . ' days');
-        $now = $now->format('Y-m-d H:i:s');
+        $retry_days = Subscriptions::retry_days();
+
+        self::sync_exhausted_subscription_statuses();
+
+        $today_end = new \DateTime();
+        $today_end->setTime(23, 59, 59);
+
+        $retry_from = new \DateTime();
+        $retry_from->modify('-' . $retry_days . ' days');
+        $retry_from->setTime(0, 0, 0);
 
         $subscriptions = Subscription::findAll([
-            'where' => ['t.valid_to < %s AND t.status IN (%d) AND card_id IS NOT NULL', $now, Subscription::STATUS_ACTIVE]
+            'where' => [
+                't.valid_to <= %s AND t.valid_to >= %s AND t.status IN (%d, %d) AND card_id IS NOT NULL',
+                $today_end->format('Y-m-d H:i:s'),
+                $retry_from->format('Y-m-d H:i:s'),
+                Subscription::STATUS_ACTIVE,
+                Subscription::STATUS_PROCESSING,
+            ],
         ]);
 
         $first = array_shift($subscriptions);
 
-        if ($first && $first->get_order()) {
-            $first->renew();
-            $first->save();
+        if ($first) {
+            try {
+                $first->renew();
+                $first->save();
+            } catch (\Exception $e) {
+                Logger::log('[P24] Subscription renew failed for #' . $first->get_id() . ': ' . $e->getMessage(), Logger::EXCEPTION);
+            }
 
             if (!empty($subscriptions)) {
                 wp_schedule_single_event(time() + 60, 'p24_renew_subscription');
             }
         }
+    }
+
+    public static function sync_exhausted_subscription_statuses(): int
+    {
+        $retry_days = Subscriptions::retry_days();
+        $cutoff = new \DateTime();
+        $cutoff->modify('-' . $retry_days . ' days');
+        $cutoff->setTime(0, 0, 0);
+
+        $expired = Subscription::findAll([
+            'where' => [
+                't.valid_to < %s AND t.status IN (%d, %d)',
+                $cutoff->format('Y-m-d H:i:s'),
+                Subscription::STATUS_ACTIVE,
+                Subscription::STATUS_PROCESSING,
+            ],
+        ]);
+
+        $suspended = 0;
+
+        foreach ($expired as $subscription) {
+            if ($subscription->suspense()) {
+                $suspended++;
+                Logger::log(sprintf('[P24] Subscription #%d suspended after retry window (%d days).', $subscription->get_id(), $retry_days));
+            }
+        }
+
+        return $suspended;
     }
 }

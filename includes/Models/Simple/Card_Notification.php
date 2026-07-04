@@ -17,18 +17,20 @@ class Card_Notification
 
     public function __construct(array $data)
     {
-        $this->order_id = (int)$data['orderId'];
-        $this->session_id = $data['sessionId'];
+        $this->order_id = (int) ($data['orderId'] ?? 0);
+        $this->session_id = (string) ($data['sessionId'] ?? '');
         $card = [];
 
         if (isset($data['result'])) {
             $result = $data['result'];
 
-            $this->error_code = (int)str_replace('err', '', $result['error']);
-            $this->message = $result['message'];
+            $this->error_code = (int) str_replace('err', '', (string) ($result['error'] ?? ''));
+            $this->message = (string) ($result['message'] ?? '');
 
             if ($this->error_code > 0) {
-                $this->reject_message = $result['rejectReason'];
+                $this->reject_message = isset($result['rejectReason'])
+                    ? (string) $result['rejectReason']
+                    : null;
             }
 
             if (isset($result['cardInfoData'])) {
@@ -47,7 +49,9 @@ class Card_Notification
             }
 
             if ($this->error_code > 0) {
-                $this->reject_message = $data['errorMessage'];
+                $this->reject_message = isset($data['errorMessage'])
+                    ? (string) $data['errorMessage']
+                    : null;
             }
 
             if (isset($data['maskedCCNumber'])) {

@@ -187,7 +187,7 @@ class Reference extends Record
 
     public function get_customer(): ?WC_Customer
     {
-        if (isset($this->customer)) {
+        if (!isset($this->customer) && $this->get_customer_id()) {
             $this->customer = new WC_Customer($this->get_customer_id());
         }
 
@@ -207,26 +207,76 @@ class Reference extends Record
 
         $customer_id = $customer_id ?: (int)$order->get_customer_id();
 
-        $references = static::findAll(['where' =>
-            ['t.user_id = %d AND t.hash = %s', $customer_id, $reference->get_hash()]
-        ]);
-
-        $founded_reference = array_shift($references);
-        $reference_id = null;
+        $founded_reference = null;
+        $hash = $reference->get_hash();
+        if ($hash !== '') {
+            $references = static::findAll(['where' =>
+                ['t.user_id = %d AND t.hash = %s', $customer_id, $hash]
+            ]);
+            $founded_reference = array_shift($references);
+        }
 
         if (!empty($founded_reference)) {
-            $reference_id = $founded_reference->get_id();
-        } else {
-            $new_reference = new Reference();
-            $new_reference->parse($reference->to_array());
-            $new_reference->set_customer_id($customer_id);
+            static::merge_reference_from_simple($founded_reference, $reference, $customer_id);
 
-            if ($new_reference->save()) {
-                $reference_id = $new_reference->get_id();
+            return $founded_reference->get_id();
+        }
+
+        $payload = $reference->to_array();
+        $info = (string) ($payload['info'] ?? '');
+        $type = (string) ($payload['type'] ?? '');
+        if ($info !== '' && $type !== '') {
+            $by_mask = static::findAll([
+                'where' => ['t.user_id = %d AND t.info = %s AND t.type = %s', $customer_id, $info, $type],
+                'order' => 't.id DESC',
+                'limit' => 1,
+            ]);
+            $existing_by_mask = array_shift($by_mask);
+            if (!empty($existing_by_mask)) {
+                static::merge_reference_from_simple($existing_by_mask, $reference, $customer_id);
+
+                return $existing_by_mask->get_id();
             }
         }
 
-        return $reference_id;
+        $new_reference = new Reference();
+        $new_reference->parse($reference->to_array());
+        $new_reference->set_customer_id($customer_id);
+
+        return $new_reference->save() ? $new_reference->get_id() : null;
+    }
+
+    private static function merge_reference_from_simple(Reference $target, Reference_Simple $source, int $customer_id): void
+    {
+        $payload = $source->to_array();
+        $payload['id'] = $target->get_id();
+        $payload['user_id'] = $customer_id;
+
+        if (($payload['status'] ?? null) === null) {
+            unset($payload['status']);
+        }
+        if (($payload['hash'] ?? '') === '') {
+            unset($payload['hash']);
+        }
+        if (($payload['type'] ?? '') === '') {
+            unset($payload['type']);
+        }
+        if (($payload['info'] ?? '') === '') {
+            unset($payload['info']);
+        }
+
+        if (($payload['valid_to'] ?? '') === '') {
+            $current = $target->get_valid_to();
+            if ($current) {
+                $payload['valid_to'] = $current->format('Y-m-d');
+            } else {
+                unset($payload['valid_to']);
+            }
+        }
+
+        $target->parse($payload);
+        $target->set_customer_id($customer_id);
+        $target->save();
     }
 
     public function get_icon(): ?array

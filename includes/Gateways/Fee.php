@@ -36,7 +36,10 @@ class Fee
 
     public function get_fee_value(): float
     {
-        $value = (float)$this->gateway->get_option('fee_value');
+        $raw = $this->gateway->get_option('fee_value');
+        // Accept both "4.25" and "4,25" regardless of locale/input method.
+        // wc_format_decimal handles thousand separators + locale decimal separator safely.
+        $value = (float) wc_format_decimal((string) $raw, wc_get_price_decimals());
 
         if (Multicurrency::is_enabled()) {
             $value *= Multicurrency::get_config()->get_multiplier();

@@ -130,6 +130,10 @@ class Card_Webhooks extends Webhook
         $notification->card->set_status(Reference::STATUS_REGISTERED);
         $card_id = Reference::save_reference($notification->card, $order);
 
+        if ($card_id) {
+            $order->delete_meta_data('_p24_save_card');
+        }
+
         if ($card_id && $has_subscription) {
             $this->create_subscriptions_for_order($order);
             Helper::activate_subscription($order, $card_id);

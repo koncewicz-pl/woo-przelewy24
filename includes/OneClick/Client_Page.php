@@ -31,9 +31,7 @@ class Client_Page extends Account_Page
 
         global $current_user;
 
-        $id = (int)sanitize_key($_POST['id']);
-
-        error_log('[p24][oneclick] remove_one_click called, POST: ' . print_r($_POST, true));
+        $id = isset($_POST['id']) ? absint($_POST['id']) : 0;
 
         $references = Reference::findAll([
             'where' => ['user.ID = %d AND t.id = %d', $current_user->ID, $id],
@@ -44,20 +42,35 @@ class Client_Page extends Account_Page
             $message = __('One click cannot be removed', 'woocommerce-p24');
             wc_add_notice($message, 'error');
             wp_send_json_error(['error' => true, 'message' => $message]);
-            error_log('[p24][oneclick] remove_one_click failed: reference not found for id ' . $id);
-            exit;
         }
 
         $reference = $references[0];
+
+        $db = Subscription::db();
+        $linked_count = (int) $db->get_var($db->prepare(
+            'SELECT COUNT(1) FROM ' . Subscription::table_name() . ' WHERE card_id = %d AND user_id = %d',
+            $id,
+            (int) $current_user->ID
+        ));
+
+        if ($linked_count > 0) {
+            $message = __(
+                'This card is linked to a subscription. Cancel that subscription under P24 Subscriptions in your account first, then you can remove the card.',
+                'woocommerce-p24'
+            );
+            wc_add_notice($message, 'error');
+            wp_send_json_error(['error' => true, 'message' => $message]);
+        }
 
         if ($reference->delete()) {
             $message = __('One click successfully removed', 'woocommerce-p24');
             wc_add_notice($message);
             wp_send_json_success(['success' => true, 'message' => $message]);
-            error_log('[p24][oneclick] remove_one_click success for id ' . $id);
         }
 
-        exit;
+        $message = __('One click cannot be removed', 'woocommerce-p24');
+        wc_add_notice($message, 'error');
+        wp_send_json_error(['error' => true, 'message' => $message]);
     }
 
     public function tab_name(): string
@@ -89,7 +102,12 @@ class Client_Page extends Account_Page
         });
 
         Assets::add_script_localize('przelewy24-account-one-clicks-js', 'przelewy24OneClicksParams', [
-            'url' => add_query_arg(['action' => 'remove_one_click'], admin_url('admin-ajax.php'))
+            'url' => add_query_arg(['action' => 'remove_one_click'], admin_url('admin-ajax.php')),
+            'i18n' => [
+                'confirm_delete' => __('Do you want to remove this saved card? This cannot be undone.', 'woocommerce-p24'),
+                'delete_failed' => __('Could not remove the saved card. Please try again.', 'woocommerce-p24'),
+                'invalid_response' => __('The server returned an unexpected response. Please try again or contact the store.', 'woocommerce-p24'),
+            ],
         ]);
     }
 

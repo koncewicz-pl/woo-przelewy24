@@ -54,10 +54,6 @@ class Subscriptions
             update_option('p24_subscription_enabled', 'yes');
         }
 
-        if ($data->days) {
-            update_option('p24_subscription_renew', (int)$data->days);
-        }
-
         if (empty($data->results)) return;
 
         foreach ($data->results as $result) {

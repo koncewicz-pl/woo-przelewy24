@@ -69,6 +69,38 @@ class Helper
         return $result;
     }
 
+    public static function cart_has_subscription_product(): bool
+    {
+        if (function_exists('WC') && WC()->cart && !WC()->cart->is_empty()) {
+            foreach (WC()->cart->get_cart() as $cart_item) {
+                $product = $cart_item['data'] ?? null;
+
+                if ($product instanceof Product) {
+                    return true;
+                }
+
+                if (!empty($cart_item['product_id'])) {
+                    $product = wc_get_product((int) $cart_item['product_id']);
+
+                    if ($product instanceof Product) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if (function_exists('WC') && isset(WC()->session)) {
+            $order_id = WC()->session->get('store_api_draft_order');
+            $order = $order_id ? wc_get_order($order_id) : false;
+
+            if ($order instanceof \WC_Order) {
+                return self::order_has_subscription_product($order);
+            }
+        }
+
+        return false;
+    }
+
     public static function anonymize(string $value, int $visible_length = 4): string
     {
         $length = strlen($value);

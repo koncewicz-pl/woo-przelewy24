@@ -38,6 +38,7 @@ class Base_Gateway_Block extends AbstractPaymentMethodType
                 'wc-blocks-registry',
                 'wc-settings',
                 'wc-blocks-data-store',
+                'wc-blocks-checkout',
                 'wp-element',
                 'wp-html-entities',
                 'wp-i18n',

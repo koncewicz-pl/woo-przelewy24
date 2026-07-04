@@ -30,10 +30,9 @@ class Block_Installments implements IntegrationInterface
 
     public function get_script_data()
     {
-        $min   = Installments::get_min_product_price();
-        $total = WC()->cart ? WC()->cart->total : 0;
+        $total = WC()->cart ? (float) WC()->cart->total : 0.0;
 
-        if ( $total < $min ) {
+        if (!Installments::is_amount_in_installment_widget_range($total)) {
             return [ 'enabled' => false ];
         }
 

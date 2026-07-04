@@ -4,9 +4,10 @@ namespace WC_P24\Installments;
 
 use WC_P24\Assets;
 use WC_P24\Config;
-use WC_P24\Gateways\Gateways_Manager;
 use WC_P24\Helper;
+use WC_P24\Subscriptions\Product\Product;
 use WC_P24\Utilities\Payment_Methods;
+use WC_Product;
 
 class Client_Side
 {
@@ -35,7 +36,7 @@ class Client_Side
                 add_action('woocommerce_' . $widgetPosition . '_add_to_cart_form', [$this, 'add_widget_and_simulator_on_product']);
             }
 
-            if (Installments::show_widget_on_checkout() && WC()->cart && WC()->cart->total >= Installments::get_min_product_price()) {
+            if (Installments::show_widget_on_checkout() && WC()->cart && Installments::is_amount_in_installment_widget_range((float) WC()->cart->total)) {
                 add_action('woocommerce_review_order_before_payment', [$this, 'add_widget_and_simulator_on_checkout']);
             }
 
@@ -55,22 +56,16 @@ class Client_Side
 
     private function product_price_in_range($price)
     {
-        $min = Installments::get_min_product_price();
-        $max = Installments::get_max_product_price();
+        return Installments::is_amount_in_installment_widget_range((float) $price);
+    }
 
-        if ($min === 0 && $max === 0) {
-            return true;
-        }
-
-        if ($min !== 0 && $price < $min) {
+    private function is_installment_allowed_for_product(?WC_Product $product): bool
+    {
+        if (!$product) {
             return false;
         }
 
-        if ($max !== 0 && $price > $max) {
-            return false;
-        }
-
-        return true;
+        return $product->get_type() !== Product::TYPE;
     }
 
     public function is_product_and_in_range(): bool
@@ -80,11 +75,11 @@ class Client_Side
         }
 
         $product = wc_get_product(get_the_ID());
-        if (!$product) {
+        if (!$this->is_installment_allowed_for_product($product)) {
             return false;
         }
 
-        $price = (float) $product->get_price();
+        $price = (float) wc_get_price_including_tax($product);
         return $this->product_price_in_range($price);
     }
 
@@ -99,9 +94,8 @@ class Client_Side
         }
 
         $total = (float) WC()->cart->total;
-        $min = (int) Installments::get_min_product_price();
 
-        if ($total < $min) {
+        if (!Installments::is_amount_in_installment_widget_range($total)) {
             return;
         }
 
@@ -126,16 +120,15 @@ class Client_Side
     static function get_checkout_data()
     {
         $config = Config::get_instance();
-        $total = isset(WC()->cart) ? WC()->cart->total : 0;
-        $min = Installments::get_min_product_price();
-
-        $should_show = $total >= $min;
+        $total = isset(WC()->cart) ? (float) WC()->cart->total : 0.0;
+        $should_show = Installments::is_amount_in_installment_widget_range($total);
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log(
                 'CHECKOUT TOTAL: ' . $total .
-                ' | MIN: ' . $min .
-                ' | SHOW: ' . ($should_show ? 'TAK' : 'NIE')
+                ' | MIN: ' . Installments::get_min_product_price() .
+                ' | MAX: ' . Installments::get_max_product_price() .
+                ' | SHOW: ' . ($should_show ? 'YES' : 'NO')
             );
         }
 
@@ -168,7 +161,14 @@ class Client_Side
             return [];
         }
 
-        $price = (float) $product->get_price();
+        if ($product->get_type() === Product::TYPE) {
+            return [
+                'show' => false,
+                'showSimulator' => false,
+            ];
+        }
+
+        $price = (float) wc_get_price_including_tax($product);
 
         return [
             'config' => [
@@ -183,7 +183,7 @@ class Client_Side
                 'position' => Installments::get_product_widget_position() ?? 'before',
                 'where' => 'product'
             ],
-            'show' => true,
+            'show' => Installments::is_amount_in_installment_widget_range($price),
             'showSimulator' => Installments::show_simulator(),
             'widgetType' => Installments::get_type_of_widget() ?? 'mini'
         ];

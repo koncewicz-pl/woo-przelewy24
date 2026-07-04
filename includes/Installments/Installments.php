@@ -20,7 +20,7 @@ class Installments extends Module
 
         add_action('init', [$this, 'registerBlock']);
 
-        if (self::show_widget_on_checkout() && (!WC()->cart || WC()->cart->total >= self::get_min_product_price())) {
+        if (self::show_widget_on_checkout() && (!WC()->cart || self::is_amount_in_installment_widget_range((float) WC()->cart->total))) {
             add_action('woocommerce_blocks_loaded', [$this, 'wooBlocks']);
         }
 
@@ -65,6 +65,27 @@ class Installments extends Module
     static function get_max_product_price(): ?int
     {
         return (int)get_option(self::PREFIX . 'max_product_price', 50000);
+    }
+
+    /** Min/max from settings (0 = disabled); same rules as product widget, applied to cart total on checkout. */
+    public static function is_amount_in_installment_widget_range(float $amount): bool
+    {
+        $min = self::get_min_product_price();
+        $max = self::get_max_product_price();
+
+        if ($min === 0 && $max === 0) {
+            return true;
+        }
+
+        if ($min !== 0 && $amount < $min) {
+            return false;
+        }
+
+        if ($max !== 0 && $amount > $max) {
+            return false;
+        }
+
+        return true;
     }
 
     static function show_widget_on_checkout(): bool
@@ -125,6 +146,10 @@ class Installments extends Module
     public static function add_as_gateway_in_block($fetch_methods, &$featured): void
     {
         if (self::is_enabled() && self::show_as_payment_method()) {
+            if ($fetch_methods && WC()->cart && !self::is_amount_in_installment_widget_range((float) WC()->cart->total)) {
+                return;
+            }
+
             $methods = $fetch_methods ? Gateways_Manager::get_available_methods() : [];
 
             $installmentGateway = array_values(array_filter($methods, function ($gateway) {

@@ -93,10 +93,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const statusEl = document.getElementById('p24-status-message');
     const loaderEl = document.querySelector('.p24-loader');
     const processingMsg = document.getElementById('p24-processing-msg');
-    const intervalTime = 1000;
-    const maxTime = 5000;
-    let elapsed = 0;
-    let interval;
+    const initialDelay = 2000;
+    const intervalTime = 2500;
+    const maxTime = 20000;
+    let startedAt = 0;
+    let interval = null;
+    let timeoutId = null;
 
     function hideProcessingMsg() {
         if (processingMsg) processingMsg.style.display = 'none';
@@ -107,29 +109,51 @@ document.addEventListener('DOMContentLoaded', function () {
         if (done && loaderEl) loaderEl.remove();
     }
 
+    function stopPolling() {
+        if (interval) {
+            clearInterval(interval);
+            interval = null;
+        }
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+    }
+
+    function startPolling() {
+        stopPolling();
+        startedAt = Date.now();
+        timeoutId = setTimeout(function() {
+            timeoutId = null;
+            checkStatus();
+            interval = setInterval(checkStatus, intervalTime);
+        }, initialDelay);
+    }
+
     function end(html, allowRetry = false) {
-        clearInterval(interval);
+        stopPolling();
         if (allowRetry) {
-            html += '<br><button id=\"p24-retry-btn\">Sprawdź ponownie</button>';
+            html += '<br><button id=\"p24-retry-btn\">" . esc_js(__('Check again', 'woocommerce-p24')) . "</button>';
         }
         setStatus(html, true);
         hideProcessingMsg();
         const retryBtn = document.getElementById('p24-retry-btn');
         if (retryBtn) {
             retryBtn.addEventListener('click', function() {
-                elapsed = 0;
-                if (statusEl) statusEl.innerHTML = '<strong>Trwa ponowne sprawdzanie statusu płatności...</strong>';
-                if (loaderEl) document.getElementById('p24-payment-status').appendChild(loaderEl);
+                if (statusEl) statusEl.innerHTML = '<strong>" . esc_js(__('Rechecking payment status...', 'woocommerce-p24')) . "</strong>';
+                const container = document.getElementById('p24-payment-status');
+                if (loaderEl && container && !container.contains(loaderEl)) {
+                    container.appendChild(loaderEl);
+                }
                 if (processingMsg) processingMsg.style.display = 'block';
-                interval = setInterval(checkStatus, intervalTime);
+                startPolling();
             });
         }
     }
 
     function checkStatus() {
-        elapsed += intervalTime;
-        if (elapsed >= maxTime) {
-            end('<strong>Nie otrzymano jeszcze potwierdzenia płatności.</strong>', true);
+        if (Date.now() - startedAt >= maxTime) {
+            end('<strong>" . esc_js(__('Payment confirmation has not been received yet.', 'woocommerce-p24')) . "</strong>', true);
             return;
         }
 
@@ -138,26 +162,25 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 const status = data?.data?.status ?? null;
                 if (data.success && status === 'paid') {
-                    end('<strong style=\"color:green; text-align: center;\">Płatność została potwierdzona.</strong>');
+                    end('<strong style=\"color:green; text-align: center;\">" . esc_js(__('Payment has been confirmed.', 'woocommerce-p24')) . "</strong>');
                 } else if (data.success && status === 'pending') {
-                    setStatus('<strong style=\"color:orange; text-align: center;\">Oczekiwanie na potwierdzenie płatności</strong>');
+                    setStatus('<strong style=\"color:orange; text-align: center;\">" . esc_js(__('Waiting for payment confirmation', 'woocommerce-p24')) . "</strong>');
                 } else {
-                    setStatus('<strong>Trwa sprawdzanie statusu płatności...</strong>');
+                    setStatus('<strong>" . esc_js(__('Checking payment status...', 'woocommerce-p24')) . "</strong>');
                 }
             })
             .catch(() => {
-                setStatus('<strong style=\"color:#b00;\">Nie udało się sprawdzić statusu płatności.</strong>');
+                setStatus('<strong style=\"color:#b00;\">" . esc_js(__('Could not check payment status.', 'woocommerce-p24')) . "</strong>');
             });
     }
 
     if (!orderId) {
-        setStatus('<strong>Nie udało się zidentyfikować zamówienia.</strong>', true);
+        setStatus('<strong>" . esc_js(__('Could not identify the order.', 'woocommerce-p24')) . "</strong>', true);
         hideProcessingMsg();
         return;
     }
 
-    setTimeout(checkStatus, 1000);
-    interval = setInterval(checkStatus, intervalTime);
+    startPolling();
 });
 ");
     }

@@ -15,8 +15,18 @@ class Assets
 
     public function __construct()
     {
-        self::add_script_asset('p24-admin-general', 'admin-general.bundle.min.js', true);
-        self::add_script_asset('p24-block-checkout', 'block-checkout.js', false, false, false, ['react', 'wp-html-entities']);
+        self::add_script_asset('p24-admin-general', 'admin-general.bundle.min.js', true, false, false, [
+            'wp-i18n',
+            'wp-util',
+            'wp-element',
+            'wp-blocks',
+        ]);
+        self::add_script_asset('p24-block-checkout', 'block-checkout.js', false, false, false, [
+            'react',
+            'wp-html-entities',
+            'wp-hooks',
+            'wc-blocks-checkout',
+        ]);
         self::add_style_asset('p24-admin-styles', 'admin-styles.css', true);
         self::add_script_asset('p24-online-payments', 'online-payments.bundle.js');
         self::add_style_asset('p24-styles', 'styles.css');
@@ -40,6 +50,9 @@ class Assets
             if ($for_admin === $admin && $load) {
                 $url = $external ? $file : WC_P24_PLUGIN_URL . 'assets/js/' . $file;
                 wp_enqueue_script($handle, $url, $depedencies, Core::$version, true);
+                if (function_exists('wp_set_script_translations')) {
+                    wp_set_script_translations($handle, 'woocommerce-p24', WC_P24_PLUGIN_PATH . 'languages');
+                }
             }
         }
 

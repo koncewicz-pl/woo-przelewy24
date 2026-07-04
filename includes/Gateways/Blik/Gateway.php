@@ -33,8 +33,10 @@ class Gateway extends WC_Payment_Gateway
     {
         $this->id = Core::BLIK_IN_SHOP_METHOD;
 
-        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/blik.svg');
-        $this->method = Payment_Methods::BLIK_PAYMENT;
+        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/blik.svg', $this->id);
+        // get_configured_blik_method() returns null when sync confirmed no Level 0 on account;
+        // use 0 as placeholder — is_available() will prevent the gateway from being used.
+        $this->method = $this->get_configured_blik_method() ?? 0;
         $this->description = $this->get_option('description');
         $this->supports = ['products', 'refunds'];
 
@@ -47,10 +49,63 @@ class Gateway extends WC_Payment_Gateway
         $this->webhooks = new Blik_Webhooks($this);
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, [$this, 'process_admin_options']);
+        add_action('woocommerce_update_options_payment_gateways_' . $this->id, [Payment_Methods::class, 'sync_blik_level0_method_id'], 20);
         add_action('woocommerce_rest_checkout_process_payment_with_context', [$this, 'process_payment_rest'], 10, 2);
+
+        if (is_admin()) {
+            add_action('admin_notices', [$this, 'maybe_show_blik_unavailable_notice']);
+        }
 
         $this->init_form_fields();
         $this->init_legacy();
+    }
+
+    /**
+     * Return the BLIK Level 0 method ID resolved from the P24 account.
+     * Returns null when sync confirmed no Level 0 on the account.
+     * Falls back to 181 only when sync has never run (backward-compatible default).
+     */
+    public function get_configured_blik_method(): ?int
+    {
+        return Payment_Methods::get_blik_level0_method_id();
+    }
+
+    public function is_available(): bool
+    {
+        if (!parent::is_available()) {
+            return false;
+        }
+
+        // Hide from checkout when sync confirmed no Level 0 on this P24 account
+        if (Payment_Methods::is_blik_level0_available() === false) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Show an admin notice when BLIK gateway is enabled but no Level 0 method
+     * was found on the P24 account during the last sync.
+     */
+    public function maybe_show_blik_unavailable_notice(): void
+    {
+        if ($this->get_option('enabled') !== 'yes') {
+            return;
+        }
+
+        if (Payment_Methods::is_blik_level0_available() !== false) {
+            return;
+        }
+
+        $screen = get_current_screen();
+        if (!$screen || $screen->id !== 'woocommerce_page_wc-settings') {
+            return;
+        }
+
+        echo '<div class="notice notice-error"><p>'
+            . esc_html__('BLIK Level 0 payment method is not available on this Przelewy24 account. Please contact P24.', 'woocommerce-p24')
+            . '</p></div>';
     }
 
     public function one_click_enabled(): bool
@@ -143,6 +198,10 @@ class Gateway extends WC_Payment_Gateway
 
     public function payment(\WC_Order $order, array $payment_data = []): array
     {
+        if (!$this->method) {
+            throw new \Exception(__('BLIK Level 0 is not available on this P24 account.', 'woocommerce-p24'));
+        }
+
         $payment_data = $this->sanitize($payment_data);
         $this->validate($payment_data);
 

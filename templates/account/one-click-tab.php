@@ -20,19 +20,19 @@ use WC_P24\Models\Database\Reference;
     </div>
 <?php else: ?>
 
-    <table class="shop_table shop_table_responsive account-p24-one-clicks-table">
+    <table class="shop_table shop_table_responsive account-p24-one-clicks-table p24-account-table">
         <thead>
         <tr>
-            <th>
+            <th class="p24-col-type">
                 <span class="nobr"><?= __('Type', 'woocommerce-p24') ?></span>
             </th>
-            <th>
+            <th class="p24-col-name">
                 <span class="nobr"><?= __('Name/Card number', 'woocommerce-p24') ?></span>
             </th>
-            <th>
+            <th class="p24-col-valid-to">
                 <span class="nobr"><?= __('Valid to', 'woocommerce-p24') ?></span>
             </th>
-            <th>
+            <th class="p24-col-actions">
                 <span class="nobr"><?= __('Actions', 'woocommerce-p24') ?></span>
             </th>
         </tr>
@@ -45,7 +45,7 @@ use WC_P24\Models\Database\Reference;
             $is_blik = in_array($item->get_type(), [Reference::TYPE_BLIK, Reference::TYPE_BLIK_RECURRING]);
             ?>
             <tr>
-                <td data-title="<?= __('Type', 'woocommerce-p24') ?>">
+                <td class="p24-cell-type" data-title="<?= __('Type', 'woocommerce-p24') ?>">
                     <?php if (!empty($icon)): ?>
                         <img src="<?= $icon['url'] ?>" alt="<?= $icon['alt'] ?>" />
                     <?php else: ?>
@@ -53,7 +53,7 @@ use WC_P24\Models\Database\Reference;
                     <?php endif; ?>
                 </td>
 
-                <td data-title="<?= __('Name/Card number', 'woocommerce-p24') ?>">
+                <td class="p24-cell-name" data-title="<?= __('Name/Card number', 'woocommerce-p24') ?>">
                     <?php if ($is_blik) : ?>
                         <?= $item->get_info() ?>
                     <?php else: ?>
@@ -64,14 +64,20 @@ use WC_P24\Models\Database\Reference;
                     <?php endif; ?>
                 </td>
 
-                <td data-title="<?= __('Valid to', 'woocommerce-p24') ?>">
+                <td class="p24-cell-valid-to" data-title="<?= __('Valid to', 'woocommerce-p24') ?>">
                     <?= $item->get_valid_to()->format($is_blik ? 'd/m/Y' : 'm/Y') ?>
                 </td>
 
-                <td data-title="<?= __('Actions', 'woocommerce-p24') ?>">
+                <td class="p24-cell-actions" data-title="<?= __('Actions', 'woocommerce-p24') ?>">
                     <?php if (!$is_blik) : ?>
-                        <button type="button" data-delete data-id="<?= $item->get_id() ?>" data-nonce="<?= $nonce ?>"
-                                class="woocommerce-button wp-element-button button"><?= _x('Remove', 'one click', 'woocommerce-p24') ?></button>
+                        <?php if ($item->has_subscriptions()) : ?>
+                            <button type="button" disabled aria-disabled="true"
+                                    title="<?= esc_attr(__('This card is linked to a subscription. Cancel that subscription under P24 Subscriptions in your account first, then you can remove the card.', 'woocommerce-p24')) ?>"
+                                    class="woocommerce-button wp-element-button button"><?= _x('Remove', 'one click', 'woocommerce-p24') ?></button>
+                        <?php else : ?>
+                            <button type="button" data-delete data-id="<?= $item->get_id() ?>" data-nonce="<?= $nonce ?>"
+                                    class="woocommerce-button wp-element-button button"><?= _x('Remove', 'one click', 'woocommerce-p24') ?></button>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -79,31 +85,5 @@ use WC_P24\Models\Database\Reference;
         <?php endforeach; ?>
         </tbody>
     </table>
-
-    <script>
-      (function(){
-        const url = "<?= esc_js(add_query_arg(['action' => 'remove_one_click'], admin_url('admin-ajax.php'))) ?>";
-        document.addEventListener('click', function(e){
-          const btn = e.target.closest && e.target.closest('button[data-delete]');
-          if (!btn) return;
-          e.preventDefault();
-          try { e.stopPropagation(); } catch (err) {}
-          const id = btn.dataset.id;
-          const nonce = btn.dataset.nonce;
-          if (!url) { alert('Missing endpoint URL'); return; }
-          const body = new FormData();
-          body.append('nonce', nonce);
-          body.append('id', parseInt(id));
-          (async function(){
-            try{
-              const response = await fetch(url, { method: 'POST', body: body, credentials: 'same-origin' });
-              const text = await response.text();
-              if (!text) { if (response.ok) { window.location.reload(); return; } alert('Empty response'); return; }
-              try { const data = JSON.parse(text); if (data && (data.success === true || data.success === 'true')) { window.location.reload(); return; } alert(data && data.data && data.data.message ? data.data.message : 'Error'); } catch (err) { alert('Invalid JSON response'); }
-            }catch(err){ console.warn('p24 remove error', err); alert(err && err.message ? err.message : 'Error'); }
-          })();
-        }, true);
-      })();
-    </script>
 
 <?php endif; ?>

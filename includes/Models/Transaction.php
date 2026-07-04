@@ -7,7 +7,6 @@ if (!defined('ABSPATH')) {
 }
 
 use WC_P24\API\Resources\Blik_Resource;
-use WC_P24\API\Resources\Card_Resource;
 use WC_P24\API\Resources\Paywall_Resource;
 use WC_P24\API\Resources\Resource;
 use WC_P24\API\Resources\Transaction_Resource;
@@ -128,7 +127,8 @@ class Transaction
                 $parts[1] = "dirmet({$this->method})";
             }
 
-            if ($this->method == Payment_Methods::BLIK_PAYMENT) {
+            // Level 0 BLIK suffix (b0/b0oc) only for in-shop BLIK methods (181 or 342)
+            if (Payment_Methods::is_blik_level0($this->method)) {
                 $parts[2] = 'b0';
                 if ($this->one_click === self::ONE_CLICK_BLIK) {
                     $parts[2] = 'b0oc';
@@ -231,6 +231,7 @@ class Transaction
             'sessionId' => $this->get_session_id(),
             'amount' => $this->amount,
             'currency' => $this->currency,
+            /* translators: %s: WooCommerce order number. */
             'description' => sprintf(__('Order no.: %s', 'woocommerce-p24'), $this->order->get_order_number()),
             'email' => $this->get_transaction_email(),
             'country' => $this->order->get_billing_country(),
@@ -251,7 +252,7 @@ class Transaction
         }
 
         if (!empty($this->card)) {
-            $data['cardData'] = [
+            $cardData = [
                 'means' => [
                     'referenceNumber' => [
                         'id' => $this->card->get_ref_id()
@@ -260,11 +261,9 @@ class Transaction
                 'transactionType' => $this->card_payment_type,
             ];
 
-            if (in_array($this->card_payment_type, [self::CARD_ONE_CLICK])) {
-                $data['methodRefId'] = $this->card->get_ref_id();
-            }
+            $data['cardData'] = $cardData;
 
-            if (in_array($this->card_payment_type, [self::CARD_INITIAL])) {
+            if (in_array($this->card_payment_type, [self::CARD_INITIAL], true)) {
                 $save_card_url = Card_Webhooks::get_notification_card_url($this->order->get_id());
                 $data['urlNotify'] = $save_card_url;
                 $data['urlCardPaymentNotification'] = $save_card_url;
@@ -283,11 +282,11 @@ class Transaction
             ];
         }
 
-        if ($this->method == Payment_Methods::BLIK_PAYMENT) {
+        if (Payment_Methods::is_blik_level0($this->method)) {
             $this->set_additional_data($data);
         }
 
-        if ($this->method == Payment_Methods::BLIK_PAYMENT && $this->save_blik) {
+        if (Payment_Methods::is_blik_level0($this->method) && $this->save_blik) {
             $data['referenceRegister'] = true;
         }
 
@@ -295,7 +294,7 @@ class Transaction
             $data['methodRefId'] = $this->reference->get_ref_id();
         }
 
-        $waitForResultEnabled = get_option('p24_wait_for_result', 'no') === 'yes';
+        $waitForResultEnabled = get_option('p24_wait_for_result', 'yes') === 'yes';
         $methodGroup = Payment_Methods::get_group_name($this->method);
 
         if ($waitForResultEnabled && !in_array($methodGroup, ['Installments', 'TraditionalTransfer'], true)) {
@@ -340,12 +339,25 @@ class Transaction
     public function reset_session()
     {
         $this->session_id = null;
-        $this->trace_id = null;
         $this->token = null;
     }
 
     public function register(): void
     {
+        $existing_token = $this->order->get_meta(self::TOKEN_KEY, true);
+        if (
+            is_string($existing_token) && $existing_token !== ''
+            && in_array($this->order->get_status(), ['pending', 'on-hold'], true)
+        ) {
+            $this->token = $existing_token;
+            $stored_session = $this->order->get_meta(self::SESSION_ID_KEY, true);
+            if (is_string($stored_session) && $stored_session !== '') {
+                $this->session_id = $stored_session;
+            }
+
+            return;
+        }
+
         $url = Encryption::encrypt($this->order->get_checkout_order_received_url());
         $this->return_url = General_Webhooks::get_return_url($url);
         $this->order->update_meta_data('_p24_return_url', $this->return_url);
@@ -361,11 +373,8 @@ class Transaction
         $this->token = $response['data']['token'];
         $this->order->update_meta_data(self::SESSION_ID_KEY, $this->session_id);
         $this->order->update_meta_data(self::TOKEN_KEY, $this->token);
+        /* translators: 1: Przelewy24 session ID. 2: Transaction token. */
         $this->order->add_order_note(sprintf(__('Register transaction<br/><strong>Session ID</strong>: %1$s <br/><strong>Token</strong>: %2$s', 'woocommerce-p24'), $this->session_id, $this->token));
-
-        if ($this->card && $this->card_payment_type === self::CARD_INITIAL) {
-            $this->order->update_meta_data(self::TRACE_ID_KEY, $this->token);
-        }
 
         $this->order->save();
     }
@@ -380,7 +389,7 @@ class Transaction
             'amount' => $notification->amount,
             'originAmount' => $notification->origin_amount,
             'currency' => $notification->currency,
-            'orderId' => $this->order_id,
+            'orderId' => $notification->order_id,
             'methodId' => $notification->method_id,
             'statement' => $notification->statement,
             'crc' => $config->get_crc_key()
@@ -388,9 +397,14 @@ class Transaction
         return $generated === $notification->sign;
     }
 
-    public function verify(Notification $notification): void
+    /**
+     * @return bool True when this request performed verification; false when the order was already verified (idempotent duplicate webhook).
+     */
+    public function verify(Notification $notification): bool
     {
-        if (in_array($this->order->get_status(), ['completed', 'processing'])) exit;
+        if (in_array($this->order->get_status(), ['completed', 'processing'], true)) {
+            return false;
+        }
         if ($notification->session_id !== $this->get_session_id()) {
             throw new \Exception('Session ID mismatch.');
         }
@@ -398,11 +412,16 @@ class Transaction
             throw new \Exception('Order ID not provided.');
         }
 
+        if (!$this->verify_sign($notification)) {
+            throw new \Exception('Invalid notification signature.');
+        }
+
         Multicurrency::setup($notification->currency);
         $this->save_order_id($notification->order_id);
         $response = $this->client->verify_transaction($this->get_verification_data());
 
         if (!empty($response['data']['status']) && $response['data']['status'] == 'success') {
+            /* translators: %s: Przelewy24 order ID returned after successful payment verification. */
             $this->order->add_order_note(sprintf(__('Payment verified<br/><strong>P24 order ID:</strong> %s', 'woocommerce-p24'), $notification->order_id));
             $this->order->payment_complete($notification->statement);
         } else {
@@ -410,6 +429,8 @@ class Transaction
         }
 
         $this->order->save();
+
+        return true;
     }
 
     protected function save_order_id(int $order_id): void
@@ -452,23 +473,6 @@ class Transaction
         }
     }
 
-    public function charge_card($with_3ds = false, $is_one_click = false): void
-    {
-        if ($is_one_click && $this->one_click !== self::ONE_CLICK_CARD) {
-            return;
-        }
-
-        $token = $this->get_token();
-        $client = new Card_Resource();
-        $response = $with_3ds ? $client->charge_with_3ds($token) : $client->charge($token);
-
-        if (empty($response['data']['orderId'])) {
-            throw new \Exception('Card charge failed');
-        }
-
-        $this->save_order_id($response['data']['orderId']);
-    }
-
     public function do_payment()
     {
         $response = $this->client->do_payment([
@@ -477,7 +481,7 @@ class Transaction
         ]);
 
         if (empty($response['token'])) {
-            throw new \Exception('Card charge failed');
+            throw new \Exception(__('Card charge failed', 'woocommerce-p24'));
         }
     }
 }

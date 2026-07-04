@@ -13,6 +13,10 @@ class Initiator
         add_action('woocommerce_process_product_meta', [$this, 'back_compatibility_migrate'], 20, 2);
         add_filter('woocommerce_product_data_tabs', [$this, 'hide_product_blocks']);
         add_action('woocommerce_' . Product::TYPE . '_add_to_cart', [$this, 'add_to_cart_button']);
+
+        // Add subscription info hooks
+        add_action('woocommerce_single_product_summary', [$this, 'print_period_info'], 6);
+        add_action('woocommerce_single_product_summary', [$this, 'print_info_block'], 25);
     }
 
     // for back compatibility purpose
@@ -55,5 +59,29 @@ class Initiator
         global $product;
 
         Render::template('subscription/add-to-cart', ['product' => $product], true);
+    }
+
+    /**
+     * Print period info below product title
+     */
+    public function print_period_info()
+    {
+        global $product;
+
+        if ($product && $product->get_type() === Product::TYPE) {
+            Render::template('subscription/period-info', ['product' => $product], true);
+        }
+    }
+
+    /**
+     * Print subscription info block
+     */
+    public function print_info_block()
+    {
+        global $product;
+
+        if ($product && $product->get_type() === Product::TYPE) {
+            Render::template('subscription/info-block', ['product' => $product], true);
+        }
     }
 }

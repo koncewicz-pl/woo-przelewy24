@@ -1,0 +1,12 @@
+{
+  "src/admin/general.js": "assets/js/admin-general.bundle.min.js",
+  "src/admin/multi-currency.js": "assets/js/admin-multi-currency.bundle.min.js",
+  "src/block-p24-card/block-p24-card.js": "assets/blocks/block-p24-card/block-p24-card.js",
+  "src/block-p24-card/useCardValidation.js": "assets/blocks/block-p24-card/block-p24-card.js",
+  "src/block-p24-google-pay/block-p24-google-pay.js": "assets/blocks/block-p24-google-pay/block-p24-google-pay.js",
+  "src/block-p24-apple-pay/block-p24-apple-pay.js": "assets/blocks/block-p24-apple-pay/block-p24-apple-pay.js",
+  "src/block-p24-blik/block-p24-blik.js": "assets/blocks/block-p24-blik/block-p24-blik.js",
+  "src/block-p24-online-payments/block-p24-online-payments.js": "assets/blocks/block-p24-online-payments/block-p24-online-payments.js",
+  "src/block-p24-installments/index.js": "assets/blocks/block-p24-installments/index.js",
+  "src/block-p24-installments/frontend.js": "assets/blocks/block-p24-installments/frontend.js"
+}

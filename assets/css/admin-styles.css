@@ -749,25 +749,6 @@ textarea.p24-ui-field__control {
   max-height: var(--logo-size);
 }
 
-.p24-backoffice {
-  width: 100%;
-  display: block;
-  margin-top: 24px;
-  background: none;
-  border: none;
-  padding: 0 !important;
-  box-shadow: none;
-}
-
-.p24-backoffice {
-  display: inline-block;
-}
-
-.p24-backoffice img {
-  max-height: 100px;
-  width: auto;
-  display: block;
-}
 
 textarea[id^="woocommerce_p24"] {
   max-width: 400px;
@@ -848,6 +829,54 @@ body.admin_page_przelewy24-wizard #adminmenumain {
   padding: 0;
 }
 
+/* P24 Subscriptions List Table Styles */
+.woocommerce_page_p24-subscriptions .subsubsub {
+  margin-bottom: 8px;
+}
+
+.woocommerce_page_p24-subscriptions .p24-subscriptions-table-scroll {
+  clear: both;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  margin-bottom: 1em;
+  -webkit-overflow-scrolling: touch;
+}
+
+.woocommerce_page_p24-subscriptions .p24-subscriptions-table-scroll .wp-list-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+}
+
+.woocommerce_page_p24-subscriptions .wp-list-table .column-id { width: 50px; min-width: 50px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-frequency { width: 90px; min-width: 90px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-created { width: 90px; min-width: 90px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-order { width: 80px; min-width: 80px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-renewals { width: 80px; min-width: 80px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-checked { width: 90px; min-width: 90px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-valid { width: 95px; min-width: 95px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-status { width: 110px; min-width: 110px; }
+.woocommerce_page_p24-subscriptions .wp-list-table .column-actions { width: 120px; min-width: 120px; }
+
+.woocommerce_page_p24-subscriptions .wp-list-table .column-user,
+.woocommerce_page_p24-subscriptions .wp-list-table .column-product {
+  min-width: 140px;
+  max-width: 200px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.woocommerce_page_p24-subscriptions .wp-list-table td.column-actions .button {
+  display: block;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+  margin-bottom: 5px;
+}
+
+.woocommerce_page_p24-subscriptions .wp-list-table td.column-actions .button:last-child { margin-bottom: 0; }
 
 
 

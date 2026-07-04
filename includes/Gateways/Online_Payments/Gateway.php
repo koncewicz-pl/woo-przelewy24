@@ -6,13 +6,14 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+use Automattic\WooCommerce\StoreApi\Payments\PaymentContext;
+use Automattic\WooCommerce\StoreApi\Payments\PaymentResult;
 use WC_P24\Core;
 use WC_P24\Gateways\Fee;
 use WC_P24\Gateways\Gateways_Manager;
 use WC_P24\Gateways\Payment_Helpers;
 use WC_P24\Gateways\Settings_Helper;
 use WC_P24\Installments\Installments;
-use WC_P24\Utilities\Base_Gateway_Block;
 use WC_P24\Utilities\Payment_Methods;
 use WC_Payment_Gateway;
 
@@ -25,7 +26,7 @@ class Gateway extends WC_Payment_Gateway
     public function __construct()
     {
         $this->id = Core::MAIN_METHOD;
-        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/logo-small.png');
+        $this->icon = apply_filters('woocommerce_gateway_icon', WC_P24_PLUGIN_URL . 'assets/logo-small.png', $this->id);
 
         $this->has_fields = $this->get_option('show_available_methods') == 'yes';
         $this->description = $this->get_option('description');
@@ -39,8 +40,31 @@ class Gateway extends WC_Payment_Gateway
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, [$this, 'process_admin_options']);
         add_action('woocommerce_after_checkout_validation', [$this, 'legacy_checkout_validation'], 10, 2);
+        add_action('woocommerce_rest_checkout_process_payment_with_context', [$this, 'process_payment_rest'], 10, 2);
 
         $this->init_form_fields();
+    }
+
+    public function process_payment_rest(PaymentContext $context, PaymentResult &$payment_result): void
+    {
+        if ($context->payment_method !== Core::MAIN_METHOD) {
+            return;
+        }
+
+        try {
+            $payment_data = $this->flatten_blocks_payment_data($context->payment_data);
+            $details = $this->process_paywall_checkout($context->order->get_id(), $payment_data);
+
+            $payment_result->set_payment_details($details);
+            $payment_result->set_status('success');
+
+            if (!empty($details['redirect'])) {
+                $payment_result->set_redirect_url($details['redirect']);
+            }
+        } catch (\Exception $e) {
+            $payment_result->set_payment_details(['message' => $e->getMessage()]);
+            $payment_result->set_status('error');
+        }
     }
 
     public function init_form_fields()
@@ -106,7 +130,8 @@ class Gateway extends WC_Payment_Gateway
 
             if ($feature_payments) {
                 $methods = Payment_Methods::get_available_methods();
-                $featured = Payment_Methods::prepare_methods($methods, $featured_methods_order);
+                // Exclude BLIK Level 0 (181) from virtual gateways - it has dedicated gateway
+                $featured = Payment_Methods::prepare_methods($methods, $featured_methods_order, true);
             }
         }
 

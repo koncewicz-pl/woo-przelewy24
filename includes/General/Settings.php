@@ -8,6 +8,7 @@ use WC_P24\Config;
 use WC_P24\Models\Configuration;
 use WC_P24\Utilities\Ajax;
 use WC_P24\Utilities\Module_Settings;
+use WC_P24\Utilities\Payment_Methods;
 use WC_P24\Utilities\Validator;
 
 class Settings extends Module_Settings
@@ -116,6 +117,12 @@ class Settings extends Module_Settings
         }
 
         parent::update_settings();
+
+        // Clear payment methods cache and re-resolve BLIK method when settings are updated
+        if ($this->is_current_section()) {
+            Payment_Methods::clear_payment_methods_cache();
+            Payment_Methods::sync_blik_level0_method_id();
+        }
     }
 
     public function test_connection(): void

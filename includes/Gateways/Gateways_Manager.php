@@ -24,6 +24,9 @@ class Gateways_Manager
     static array $gateways = [];
     static array $extra_gateways = [];
 
+    /** @var bool Guards against re-entrancy when syncing cart totals before resolving payment methods. */
+    private static $p24_syncing_cart_for_methods = false;
+
     public function __construct()
     {
         new General_Webhooks();
@@ -118,7 +121,7 @@ class Gateways_Manager
             foreach ($gateways as $key => $gateway) {
                 if (isset($gateway->group) && $gateway->group === 'przelewy24') {
                     $is_available = current(array_filter($methods, function ($method) use ($gateway) {
-                        $method_id = (int)$method['id'];
+                        $method_id = isset($method['id']) ? (int) $method['id'] : 0;
                         $check_id = ($method_id === $gateway->method) || in_array($method_id, $gateway->method_alt);
 
                         return $check_id || $gateway->method === Payment_Methods::APPLE_PAY;
@@ -148,29 +151,52 @@ class Gateways_Manager
         }
     }
 
-    public static function get_available_methods(int $total = 0): array
+    /**
+     * @param int|float|string $total Amount in shop currency, or 0 to use the current cart total.
+     */
+    public static function get_available_methods($total = 0): array
     {
-        if ($total === 0) {
-            $total = isset(WC()->cart) ? WC()->cart->total : $total;
+        $amount = (float) $total;
+
+        if ($amount <= 0.0 && isset(WC()->cart) && !WC()->cart->is_empty() && !self::$p24_syncing_cart_for_methods) {
+            $cart_total = (float) WC()->cart->get_total('edit');
+            if ($cart_total <= 0.0) {
+                self::$p24_syncing_cart_for_methods = true;
+                WC()->cart->calculate_totals();
+                self::$p24_syncing_cart_for_methods = false;
+            }
         }
 
-        $available_methods = Payment_Methods::get_payment_methods(Helper::to_lowest_unit($total), Config::get_instance()->get_currency());
+        if ($amount <= 0.0) {
+            $amount = isset(WC()->cart) ? (float) WC()->cart->get_total('edit') : 0.0;
+        }
 
-        return array_filter($available_methods, function ($method) {
-            return $method['status'];
+        $available_methods = Payment_Methods::get_payment_methods(Helper::to_lowest_unit($amount), Config::get_instance()->get_currency());
+
+        return array_filter($available_methods, static function ($method) {
+            if (!is_array($method)) {
+                return false;
+            }
+            if (array_key_exists('status', $method)) {
+                return (bool) $method['status'];
+            }
+            return true;
         });
     }
 
-    public static function get_method_id_matching_group(array $group, int $total): ?int
+    /**
+     * @param int|float|string $total Order or cart total (WooCommerce often passes a string).
+     */
+    public static function get_method_id_matching_group(array $group, $total): ?int
     {
         $available_methods = self::get_available_methods($total);
 
         $payments = array_values(array_filter($available_methods, function ($payment) use ($group) {
-            return in_array($payment['id'], $group);
+            return isset($payment['id']) && in_array((int) $payment['id'], $group, true);
         }));
 
-        if (isset($payments[0])) {
-            return (int)$payments[0]['id'];
+        if (isset($payments[0]['id'])) {
+            return (int) $payments[0]['id'];
         }
 
         return 0;
@@ -197,6 +223,8 @@ class Gateways_Manager
             WC()->session->set('chosen_payment_method', $data['payment_method']);
         }
 
-        WC()->cart->calculate_totals();
+        if (WC()->cart) {
+            WC()->cart->calculate_totals();
+        }
     }
 }
